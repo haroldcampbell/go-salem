@@ -28,7 +28,7 @@ type School struct {
 }
 
 func Test_FactoryEnsure(t *testing.T) {
-	// test_simple_ensure(t)
+	test_simple_ensure(t)
 	test_nested_ensure(t)
 }
 

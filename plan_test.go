@@ -8,8 +8,8 @@ import (
 )
 
 func Test_Plan(t *testing.T) {
-	// test_default_generators(t)
-	// test_required_field_value(t)
+	test_default_generators(t)
+	test_required_field_value(t)
 }
 
 func test_default_generators(t *testing.T) {
