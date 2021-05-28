@@ -2,64 +2,53 @@ A simple go library for generating mock data based on structs.
 
 ## Why
 
-This library helps to generate structs with mock data when creating unit tests with libraries like `"github.com/stretchr/testify/suite"`
+A minimal library that helps to generate structs with mock data when creating unit tests with libraries like `"github.com/stretchr/testify/suite"`.
+
+Creating mocked data is difficult and time consuming. This leads to a lot of boiler plate code resulting in brittle tests.
+
+I wanted a faster way to define mocks based on constrains and structure instead of the exact content of all of the fields.
 
 ## Example
 
+Here's a simple example.
+
+You have a `Person` strcut to mock.
+
 ```
-type Engine struct {
-	Cylinders    int
-	HP           int
-	SerialNumber string
-}
-
-type Car struct {
-	TransactionGUID string
-
-	Name      string
-	Make      string
-	Engine    Engine
-	IsTwoDoor bool
-}
-
-type Transaction struct {
-	GUID string
-
-	Car       Car
-	OwnerName string
-	Prices    float32
+type Person struct {
+	FName   string
+	Surname string
+	Age     int
 
 	privateField int // This should be ignored
 }
+```
 
-factory := salem.Mock(Transaction{}).
-		Ensure("GUID", "GUID-153").
-		Ensure("Car.TransactionGUID", "GUID-153").
-		WithExactItems(3)
+Simply pass the struct to `salem.Mock` and then run `Execute` on the factor that is created for your struct.
 
+```
+	factory := salem.Mock(examples.Person{})
 	results := factory.Execute()
 ```
 
-Sample Output:
+Sample Output for the example:
 
 ```
+Salem mocks:
 [
   {
-    "GUID": "GUID-153",
-    "Car": {
-      "TransactionGUID": "GUID-153",
-      "Name": "QPHZBKVQBQGATXWYNUSMYWAQHWFVRHDZXTKRMTHKDSHB",
-      "Make": "ZENRFCSTTTKNDKRYRXZRRMYW",
-      "Engine": {
-        "Cylinders": 57,
-        "HP": 53,
-        "SerialNumber": "GWMVVVKXDYWJBYHWRTTHZRCW"
-      },
-      "IsTwoDoor": false
-    },
-    "OwnerName": "FZSEGCQSWWMQYGXATWHGAJKTEDSUTTGSVHAHNRDHJZ",
-    "Prices": 0.6369821
-  },
-  ...
+    "FName": "BDMHKCTVZMER",
+    "Surname": "BGGCEPUWFSKWHGH",
+    "Age": 26
+  }
 ]
 ```
+
+See the [examples](./examples/README.md) folder for more information.
+
+## Features
+
+-   Control the value of public fields that are mocked with `Ensure(...)`
+-   Control the number of mocks generated with `WithMinItems()`, `WithMaxItems()` and `WithExactItems()`
+-   Mock nested structs automatically
+-   Control nested public fields with path name e.g. `ChildField.NestedChild.OtherNestedChild`
