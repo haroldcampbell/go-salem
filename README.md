@@ -12,7 +12,7 @@ I wanted a faster way to define mocks based on constrains and structure instead 
 
 Here's a simple example.
 
-You have a `Person` strcut to mock.
+You have a `Person` struct to mock.
 
 ```
 type Person struct {
