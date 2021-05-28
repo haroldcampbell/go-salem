@@ -57,7 +57,7 @@ func (p *Plan) SetRunCount(runType RunType, n int) {
 	}
 }
 
-func (p *Plan) generateRandomMock(f *factory) interface{} {
+func (p *Plan) generateRandomMock(f *Factory) interface{} {
 	v := reflect.ValueOf(f.rootType)
 	newMockPtr := reflect.New(v.Type())
 	newElm := newMockPtr.Elem()
@@ -142,7 +142,7 @@ func distinctFileName(parentFieldName string, fieldName string) string {
 	return fmt.Sprintf("%s.%s", parentFieldName, fieldName)
 }
 
-func (p *Plan) Run(f *factory) []interface{} {
+func (p *Plan) Run(f *Factory) []interface{} {
 	items := make([]interface{}, 0)
 
 	for i := 0; i < p.run.Count; i++ {

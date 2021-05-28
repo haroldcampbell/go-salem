@@ -66,7 +66,7 @@ func Test_FactoryWithItems(t *testing.T) {
 	test_with_items(t, f)
 }
 
-func test_with_items(t *testing.T, f *factory) {
+func test_with_items(t *testing.T, f *Factory) {
 	f.WithExactItems(2)
 	assert.Equal(t, ExactRun, f.plan.run.RunType, "expect ExactRun from WithExactItems")
 	assert.Equal(t, 2, f.plan.run.Count, "expect correct run count from WithExactItems")

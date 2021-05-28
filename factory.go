@@ -4,13 +4,18 @@ import (
 	"math/rand"
 )
 
-type factory struct {
+type Factory struct {
 	rootType interface{}
 	plan     *Plan
 }
 
+// Execute execute the factory instructions to generate the mocks
+func (f *Factory) Execute() []interface{} {
+	return f.plan.Run(f)
+}
+
 // Ensure sets the value of the fields we don't want to randomly generate
-func (f *factory) Ensure(fieldName string, sharedValue interface{}) *factory {
+func (f *Factory) Ensure(fieldName string, sharedValue interface{}) *Factory {
 	f.plan.RequireFieldValue(fieldName, sharedValue)
 
 	return f
@@ -21,7 +26,7 @@ func (f *factory) Ensure(fieldName string, sharedValue interface{}) *factory {
 // specifiy the span.
 //
 // Only the first value of the span slice is used and it must be > 0.
-func (f *factory) WithMinItems(n int, span ...int) *factory {
+func (f *Factory) WithMinItems(n int, span ...int) *Factory {
 	var upperBounds int = 10
 
 	if len(span) > 0 && span[0] > 0 {
@@ -34,14 +39,14 @@ func (f *factory) WithMinItems(n int, span ...int) *factory {
 }
 
 // WithMaxItems generates up to [0, n] items
-func (f *factory) WithMaxItems(n int) *factory {
+func (f *Factory) WithMaxItems(n int) *Factory {
 	f.plan.SetRunCount(MaxRun, rand.Intn(1+n))
 
 	return f
 }
 
 // WithExactItems generates exactly n items
-func (f *factory) WithExactItems(n int) *factory {
+func (f *Factory) WithExactItems(n int) *Factory {
 	f.plan.SetRunCount(ExactRun, n)
 
 	return f
