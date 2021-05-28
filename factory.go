@@ -2,11 +2,22 @@ package salem
 
 import (
 	"math/rand"
+	"time"
 )
+
+type nilStruct struct {
+}
 
 type Factory struct {
 	rootType interface{}
 	plan     *Plan
+}
+
+// Tap creates a factory based on the public fields type.
+func Tap() *Factory {
+	nestedFactory := Mock(nilStruct{})
+
+	return nestedFactory
 }
 
 // Execute execute the factory instructions to generate the mocks
@@ -16,7 +27,14 @@ func (f *Factory) Execute() []interface{} {
 
 // Ensure sets the value of the fields we don't want to randomly generate
 func (f *Factory) Ensure(fieldName string, sharedValue interface{}) *Factory {
-	f.plan.RequireFieldValue(fieldName, sharedValue)
+
+	switch sharedValue.(type) {
+	case *Factory:
+		f.plan.EnsuredDeferredFieldValue(fieldName, sharedValue)
+
+	default:
+		f.plan.EnsuredFieldValue(fieldName, sharedValue)
+	}
 
 	return f
 }
@@ -27,27 +45,32 @@ func (f *Factory) Ensure(fieldName string, sharedValue interface{}) *Factory {
 //
 // Only the first value of the span slice is used and it must be > 0.
 func (f *Factory) WithMinItems(n int, span ...int) *Factory {
-	var upperBounds int = 10
+	f.plan.deferredRun = func() {
+		rand.Seed(time.Now().UnixNano())
+		var upperBounds int = 10
 
-	if len(span) > 0 && span[0] > 0 {
-		upperBounds = span[0]
+		if len(span) > 0 && span[0] > 0 {
+			upperBounds = span[0]
+		}
+
+		f.plan.SetRunCount(MinRun, n+rand.Intn(upperBounds))
 	}
-
-	f.plan.SetRunCount(MinRun, n+rand.Intn(upperBounds))
-
 	return f
 }
 
 // WithMaxItems generates up to [0, n] items
 func (f *Factory) WithMaxItems(n int) *Factory {
-	f.plan.SetRunCount(MaxRun, rand.Intn(1+n))
-
+	f.plan.deferredRun = func() {
+		rand.Seed(time.Now().UnixNano())
+		f.plan.SetRunCount(MaxRun, rand.Intn(1+n))
+	}
 	return f
 }
 
 // WithExactItems generates exactly n items
 func (f *Factory) WithExactItems(n int) *Factory {
-	f.plan.SetRunCount(ExactRun, n)
-
+	f.plan.deferredRun = func() {
+		f.plan.SetRunCount(ExactRun, n)
+	}
 	return f
 }

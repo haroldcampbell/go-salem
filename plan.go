@@ -2,10 +2,13 @@ package salem
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
+	"time"
 )
 
 type RunType uint
+type deferredExecuteType func(reflect.Value) GenType
 
 const (
 	Invalid RunType = iota
@@ -21,20 +24,23 @@ type PlanRun struct {
 }
 
 type fieldSetter struct {
-	fptr GenType
+	fptr            GenType
+	deferredExecute deferredExecuteType
 }
 type Plan struct {
-	fixedFields map[string]fieldSetter // fields set via ensure
-	generators  map[reflect.Kind]func() interface{}
+	ensuredFields map[string]fieldSetter // fields set via ensure
+	generators    map[reflect.Kind]func() interface{}
 
-	run        PlanRun
-	parentName string
+	run PlanRun
+
+	deferredRun func()
+	parentName  string
 }
 
 func NewPlan() *Plan {
 	p := &Plan{}
 
-	p.fixedFields = make(map[string]fieldSetter)
+	p.ensuredFields = make(map[string]fieldSetter)
 	p.generators = make(map[reflect.Kind]func() interface{})
 
 	p.initDefaultGenerators()
@@ -42,12 +48,35 @@ func NewPlan() *Plan {
 	return p
 }
 
-func (p *Plan) RequireFieldValue(fieldName string, sharedValue interface{}) {
-	p.fixedFields[fieldName] = fieldSetter{
+func (p *Plan) EnsuredFieldValue(fieldName string, sharedValue interface{}) {
+	setter := fieldSetter{
 		fptr: func() interface{} {
 			return sharedValue
 		},
 	}
+
+	p.ensuredFields[fieldName] = setter
+}
+
+func (p *Plan) makeDeferredExecute(fac *Factory) deferredExecuteType {
+	return func(iField reflect.Value) func() interface{} {
+		// Extract the type from the slice and assign an instance to the rootType.
+		// I want to go from []examples.Person to example.Person
+		fac.rootType = reflect.New(reflect.TypeOf(iField.Interface()).Elem()).Elem().Interface() // Overwrite the factory with the public field type
+
+		return func() interface{} { // The actual generator
+			result := fac.Execute()
+			return result
+		}
+	}
+}
+
+func (p *Plan) EnsuredDeferredFieldValue(fieldName string, sharedValue interface{}) {
+	setter := fieldSetter{
+		deferredExecute: p.makeDeferredExecute(sharedValue.(*Factory)),
+	}
+
+	p.ensuredFields[fieldName] = setter
 }
 
 func (p *Plan) SetRunCount(runType RunType, n int) {
@@ -57,92 +86,15 @@ func (p *Plan) SetRunCount(runType RunType, n int) {
 	}
 }
 
-func (p *Plan) generateRandomMock(f *Factory) interface{} {
-	v := reflect.ValueOf(f.rootType)
-	newMockPtr := reflect.New(v.Type())
-	newElm := newMockPtr.Elem()
-	typeOfT := v.Type()
-
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		k := field.Kind()
-		ff := newElm.Field(i)
-		fieldName := typeOfT.Field(i).Name
-
-		qualifiedName := distinctFileName(p.parentName, fieldName)
-
-		var generator GenType
-		if p.fixedFields[qualifiedName].fptr != nil {
-			generator = p.fixedFields[qualifiedName].fptr
-		} else {
-			generator = p.generators[k]
-		}
-
-		p.updateFieldValue(k, generator, ff, qualifiedName)
-	}
-
-	return newMockPtr.Elem().Interface()
-}
-
-func (p *Plan) updateFieldValue(k reflect.Kind, generator GenType, ff reflect.Value, qualifiedName string) {
-	if !ff.CanSet() {
-		return
-	}
-
-	if isPrimativeKind(k) {
-		val := generator()
-		ff.Set(reflect.ValueOf(val))
-
-		return
-	}
-
-	fieldName := ff.Type().Name()
-
-	// Complex Types
-	switch k {
-	case reflect.Array:
-		fmt.Printf("%v (array) \n", fieldName)
-	case reflect.Slice:
-		fmt.Printf("%v (slice) \n", fieldName)
-
-	case reflect.Struct:
-		if generator != nil {
-			val := generator()
-			ff.Set(reflect.ValueOf(val))
-
-		} else {
-			ff.Interface()
-			mock := Mock(ff.Interface())
-
-			mock.plan.parentName = qualifiedName
-			mock.plan.CopyParentRequiredFields(p)
-			// WithExactItems(5)
-
-			results := mock.Execute()
-
-			ff.Set(reflect.ValueOf(results[0]))
-		}
-
-	default:
-		fmt.Printf("%v (Found type) \n", fieldName)
-	}
-}
-
 func (p *Plan) CopyParentRequiredFields(pp *Plan) {
-	for k, v := range pp.fixedFields {
-		p.fixedFields[k] = v
+	for k, v := range pp.ensuredFields {
+		p.ensuredFields[k] = v
 	}
-
-}
-func distinctFileName(parentFieldName string, fieldName string) string {
-	if parentFieldName == "" {
-		return fieldName
-	}
-
-	return fmt.Sprintf("%s.%s", parentFieldName, fieldName)
 }
 
 func (p *Plan) Run(f *Factory) []interface{} {
+	p.deferredRun()
+
 	items := make([]interface{}, 0)
 
 	for i := 0; i < p.run.Count; i++ {
@@ -150,6 +102,111 @@ func (p *Plan) Run(f *Factory) []interface{} {
 	}
 
 	return items
+}
+
+func (p *Plan) generateRandomMock(f *Factory) interface{} {
+	v := reflect.ValueOf(f.rootType)
+
+	typeOfT := v.Type()
+
+	// Create an mock instance of the struct
+	newMockPtr := reflect.New(typeOfT)
+	newElm := newMockPtr.Elem()
+
+	rand.Seed(time.Now().UnixNano())
+
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i) // Get field in the struct
+		k := field.Kind()
+		fieldName := typeOfT.Field(i).Name
+
+		iField := newElm.Field(i) // Get related instance field in the mock instance
+		if !iField.CanSet() {
+			continue // Skip private instance fields
+		}
+
+		qualifiedName := distinctFileName(p.parentName, fieldName)
+		generator := p.getValueGenerator(k, iField, qualifiedName)
+
+		p.updateFieldValue(k, generator, iField, qualifiedName)
+	}
+
+	return newMockPtr.Elem().Interface()
+}
+
+func (p *Plan) getValueGenerator(k reflect.Kind, iField reflect.Value, qualifiedName string) GenType {
+	if p.ensuredFields[qualifiedName].deferredExecute != nil {
+		return p.ensuredFields[qualifiedName].deferredExecute(iField)
+	} else if p.ensuredFields[qualifiedName].fptr != nil {
+		return p.ensuredFields[qualifiedName].fptr
+	}
+
+	return p.generators[k]
+}
+
+func (p *Plan) updateFieldValue(k reflect.Kind, generator GenType, iField reflect.Value, qualifiedName string) {
+	if isPrimativeKind(k) {
+		val := generator()
+		iField.Set(reflect.ValueOf(val))
+
+		return
+	}
+
+	// Complex Types
+	switch k {
+	case reflect.Slice:
+		p.updateSliceFieldValue(generator, iField)
+
+	case reflect.Struct:
+		p.updateStructFieldValue(generator, iField, qualifiedName)
+
+	default:
+		fmt.Printf("[updateFieldValue] (Unknow type) %v \n", iField.Type().Name())
+	}
+}
+
+func (p *Plan) updateSliceFieldValue(generator GenType, iField reflect.Value) {
+	if generator == nil {
+		deferredExecute := p.makeDeferredExecute(Tap())
+		generator = deferredExecute(iField)
+	}
+
+	factorySlice := generator()
+	num := len(factorySlice.([]interface{}))
+
+	newSlice := reflect.MakeSlice(iField.Type(), num, num)
+	unboxedSlized := reflect.ValueOf(factorySlice)
+
+	for i := 0; i < unboxedSlized.Len(); i++ {
+		newSlice.Index(i).Set(unboxedSlized.Index(i).Elem())
+	}
+
+	iField.Set(newSlice)
+}
+
+func (p *Plan) updateStructFieldValue(generator GenType, iField reflect.Value, qualifiedName string) {
+	if generator != nil {
+		val := generator()
+		iField.Set(reflect.ValueOf(val))
+	} else {
+		iField.Interface()
+		mock := Mock(iField.Interface())
+
+		mock.plan.parentName = qualifiedName
+		mock.plan.CopyParentRequiredFields(p)
+
+		results := mock.Execute()
+
+		iField.Set(reflect.ValueOf(results[0]))
+	}
+}
+
+func distinctFileName(parentFieldName string, fieldName string) string {
+	if parentFieldName == "" {
+		return fieldName
+	}
+
+	return fmt.Sprintf("%s.%s", parentFieldName, fieldName)
 }
 
 func isPrimativeKind(k reflect.Kind) bool {

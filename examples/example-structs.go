@@ -14,13 +14,19 @@ type Engine struct {
 	SerialNumber string
 }
 
+type HeadLight struct {
+	Watt    int
+	Voltage int
+	Color   string
+}
 type Car struct {
 	TransactionGUID string
 
-	Name      string
-	Make      string
-	Engine    Engine
-	IsTwoDoor bool
+	Name       string
+	Make       string
+	Engine     Engine
+	HeadLights []HeadLight
+	IsTwoDoor  bool
 }
 
 type Transaction struct {

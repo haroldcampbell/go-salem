@@ -9,7 +9,7 @@ import (
 
 func Test_Plan(t *testing.T) {
 	test_default_generators(t)
-	test_required_field_value(t)
+	test_ensured_field_value(t)
 }
 
 func test_default_generators(t *testing.T) {
@@ -28,13 +28,13 @@ func test_default_generators(t *testing.T) {
 	assert.NotEmpty(t, p.GetKindGenerator(reflect.String), "expect generator for reflect.String")
 }
 
-func test_required_field_value(t *testing.T) {
+func test_ensured_field_value(t *testing.T) {
 	p := NewPlan()
 	fieldName := "add"
 	expected := 10
 
-	p.RequireFieldValue(fieldName, expected)
-	actual := p.fixedFields[fieldName].fptr()
+	p.EnsuredFieldValue(fieldName, expected)
+	actual := p.ensuredFields[fieldName].fptr()
 
-	assert.Equal(t, expected, actual, "expect RequireFieldValue(...) to set fuction to return required field value")
+	assert.Equal(t, expected, actual, "expect EnsuredFieldValue(...) to set fuction to return required field value")
 }
