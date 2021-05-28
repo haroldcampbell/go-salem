@@ -17,13 +17,23 @@ func (f *factory) Ensure(fieldName string, sharedValue interface{}) *factory {
 }
 
 // WithMinItems generates at least n items
-func (f *factory) WithMinItems(n int) *factory {
-	f.plan.SetRunCount(MinRun, rand.Intn(n+10))
+// By default WithMinItems will generated [n, n+10) items. To change the upperBounds
+// specifiy the span.
+//
+// Only the first value of the span slice is used and it must be > 0.
+func (f *factory) WithMinItems(n int, span ...int) *factory {
+	var upperBounds int = 10
+
+	if len(span) > 0 && span[0] > 0 {
+		upperBounds = span[0]
+	}
+
+	f.plan.SetRunCount(MinRun, n+rand.Intn(upperBounds))
 
 	return f
 }
 
-// WithMaxItems generates up to n items
+// WithMaxItems generates up to [0, n] items
 func (f *factory) WithMaxItems(n int) *factory {
 	f.plan.SetRunCount(MaxRun, rand.Intn(1+n))
 

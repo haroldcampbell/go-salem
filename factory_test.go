@@ -71,8 +71,9 @@ func test_with_items(t *testing.T, f *factory) {
 	assert.Equal(t, ExactRun, f.plan.run.RunType, "expect ExactRun from WithExactItems")
 	assert.Equal(t, 2, f.plan.run.Count, "expect correct run count from WithExactItems")
 
-	f.WithMinItems(2) // No need to test the run.Count as it will be based on a random value of n
+	f.WithMinItems(2)
 	assert.Equal(t, MinRun, f.plan.run.RunType, "expect MinRun from WithExactItems")
+	assert.GreaterOrEqual(t, f.plan.run.Count, 2, "expect Count to be 2 or more")
 
 	f.WithMaxItems(2) // No need to test the run.Count as it will be based on a random value of n
 	assert.Equal(t, MaxRun, f.plan.run.RunType, "expect MaxRun from WithExactItems")
