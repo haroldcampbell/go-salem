@@ -34,10 +34,15 @@ type wallet struct {
 	Notes []money
 }
 
+type vault struct {
+	Notes []*money
+}
+
 func Test_FactoryEnsure(t *testing.T) {
 	test_simple_ensure(t)
 	test_nested_ensure(t)
 	test_slice_ensure(t)
+	test_slice_pointer_ensure(t)
 }
 
 func test_simple_ensure(t *testing.T) {
@@ -67,6 +72,18 @@ func test_nested_ensure(t *testing.T) {
 
 	assert.Equal(t, requiredValue, actualMock.Child.ParentName, "should set nested public fields required value")
 	assert.Equal(t, requiredValue, actualMock.Child.Attends.NextOfKin, "should set nested public fields required value")
+}
+
+func test_slice_pointer_ensure(t *testing.T) {
+	tap := Tap().WithExactItems(5)
+
+	f := Mock(vault{})
+	f.Ensure("Notes", tap)
+
+	results := f.Execute()
+	actualMocks := results[0].(vault).Notes
+
+	assert.Equal(t, 5, len(actualMocks), "should set nested slice of pointer")
 }
 
 func test_slice_ensure(t *testing.T) {

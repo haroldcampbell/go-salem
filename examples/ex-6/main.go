@@ -6,7 +6,7 @@ import (
 	"go_utils/utils"
 )
 
-// Points Example
+// Pointers Example
 // Using Salem with points on public fields
 func main() {
 	primitivePointer()
