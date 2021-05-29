@@ -18,29 +18,43 @@ import (
 // WithMaxItems - range of items between [0, 1+n)
 
 func main() {
-	factory := salem.Mock(examples.Person{}).
-		Ensure("FName", "Sammy") // Constrain the FName field to Sammy
 	// By default salem will generate 1 mock.
 	// This can be changed by using the WithXXXItems functions.
 
-	// Uncomment the different example functions to try different WithXXX options
-	// minExample(factory)
-	// maxExample(factory)
-	// exactExample(factory)
+	// Different example functions to try different WithXXX options
+	minExample()
+	maxExample()
+	exactExample()
+}
+
+func exactExample() {
+	factory := salem.Mock(examples.Person{}).
+		Ensure("FName", "Sammy") // Constrain the FName field to Sammy
+
+	factory.WithExactItems(3) // Generates exactly 3 mock Person structs
 
 	results := factory.Execute()
 
 	str := utils.PrettyMongoString(results)
-	fmt.Printf("Salem mocks:\n%v\n\n", str)
+	fmt.Printf("exactExample mocks:\n%v\n\n", str)
 }
 
-func exactExample(factory *salem.Factory) {
-	factory.WithExactItems(3) // Generates exactly 3 mock Person structs
-}
-func maxExample(factory *salem.Factory) {
+func maxExample() {
+	factory := salem.Mock(examples.Person{}).
+		Ensure("FName", "Sammy") // Constrain the FName field to Sammy
+
 	factory.WithMaxItems(10) // Generates [0, 10] mock Person structs
+
+	results := factory.Execute()
+
+	str := utils.PrettyMongoString(results)
+	fmt.Printf("maxExample mocks:\n%v\n\n", str)
 }
-func minExample(factory *salem.Factory) {
+
+func minExample() {
+	factory := salem.Mock(examples.Person{}).
+		Ensure("FName", "Sammy") // Constrain the FName field to Sammy
+
 	// Generates [3, 13] mock Person structs
 	// By defualt WithMinItems generates between n and n + 10 mocks
 	factory.WithMinItems(3)
@@ -48,4 +62,9 @@ func minExample(factory *salem.Factory) {
 	// To change the upperBounds specify it in the span.
 	// In the case below, WithMinItems will generate [n, n+20) mocks
 	//factory.WithMinItems(3, 20)
+
+	results := factory.Execute()
+
+	str := utils.PrettyMongoString(results)
+	fmt.Printf("minExample mocks:\n%v\n\n", str)
 }
