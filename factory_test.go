@@ -20,16 +20,24 @@ type basicChild struct {
 	Name       string
 	Age        int
 
-	Attends School
+	Attends school
 }
-type School struct {
+type school struct {
 	NextOfKin string
 	Name      string
+}
+
+type money struct {
+	Value float32
+}
+type wallet struct {
+	Notes []money
 }
 
 func Test_FactoryEnsure(t *testing.T) {
 	test_simple_ensure(t)
 	test_nested_ensure(t)
+	test_slice_ensure(t)
 }
 
 func test_simple_ensure(t *testing.T) {
@@ -61,20 +69,57 @@ func test_nested_ensure(t *testing.T) {
 	assert.Equal(t, requiredValue, actualMock.Child.Attends.NextOfKin, "should set nested public fields required value")
 }
 
-func Test_FactoryWithItems(t *testing.T) {
-	f := Mock(empty{})
-	test_with_items(t, f)
+func test_slice_ensure(t *testing.T) {
+	tap := Tap().WithExactItems(5)
+
+	f := Mock(wallet{})
+	f.Ensure("Notes", tap)
+
+	results := f.Execute()
+	actualMocks := results[0].(wallet).Notes
+
+	assert.Equal(t, 5, len(actualMocks), "should set nested slice")
 }
 
-func test_with_items(t *testing.T, f *Factory) {
+func Test_FactoryWithItems(t *testing.T) {
+	test_with__items(t)
+	test_with_exact_items(t)
+	test_with_min_items(t)
+	test_with_max_items(t)
+}
+
+func test_with__items(t *testing.T) {
+	f := Mock(empty{})
+	assert.Nil(t, f.plan.run, "expect plan.run to be nil before Execute")
+}
+func test_with_exact_items(t *testing.T) {
+	f := Mock(empty{})
+
 	f.WithExactItems(2)
+	assert.Nil(t, f.plan.run, "expect WithExactItems to not change plan.run")
+
+	f.Execute()
 	assert.Equal(t, ExactRun, f.plan.run.RunType, "expect ExactRun from WithExactItems")
 	assert.Equal(t, 2, f.plan.run.Count, "expect correct run count from WithExactItems")
+}
+
+func test_with_min_items(t *testing.T) {
+	f := Mock(empty{})
 
 	f.WithMinItems(2)
-	assert.Equal(t, MinRun, f.plan.run.RunType, "expect MinRun from WithExactItems")
+	assert.Nil(t, f.plan.run, "expect WithMinItems to not change plan.run")
+
+	f.Execute()
+	assert.Equal(t, MinRun, f.plan.run.RunType, "expect MinRun from WithMinItems")
 	assert.GreaterOrEqual(t, f.plan.run.Count, 2, "expect Count to be 2 or more")
+}
+
+func test_with_max_items(t *testing.T) {
+	f := Mock(empty{})
 
 	f.WithMaxItems(2) // No need to test the run.Count as it will be based on a random value of n
+	assert.Nil(t, f.plan.run, "expect WithMaxItems to not change plan.run")
+
+	f.Execute()
 	assert.Equal(t, MaxRun, f.plan.run.RunType, "expect MaxRun from WithExactItems")
 }

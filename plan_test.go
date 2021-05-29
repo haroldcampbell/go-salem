@@ -34,7 +34,7 @@ func test_ensured_field_value(t *testing.T) {
 	expected := 10
 
 	p.EnsuredFieldValue(fieldName, expected)
-	actual := p.ensuredFields[fieldName].fptr()
+	actual := p.ensuredFields[fieldName].fieldAction()
 
 	assert.Equal(t, expected, actual, "expect EnsuredFieldValue(...) to set fuction to return required field value")
 }

@@ -8,7 +8,7 @@ import (
 )
 
 type RunType uint
-type deferredExecuteType func(reflect.Value) GenType
+type FactoryActionType func(reflect.Value) GenType
 
 const (
 	Invalid RunType = iota
@@ -24,14 +24,14 @@ type PlanRun struct {
 }
 
 type fieldSetter struct {
-	fptr            GenType
-	deferredExecute deferredExecuteType
+	fieldAction   GenType
+	factoryAction FactoryActionType
 }
 type Plan struct {
 	ensuredFields map[string]fieldSetter // fields set via ensure
 	generators    map[reflect.Kind]func() interface{}
 
-	run PlanRun
+	run *PlanRun
 
 	deferredRun func()
 	parentName  string
@@ -50,7 +50,7 @@ func NewPlan() *Plan {
 
 func (p *Plan) EnsuredFieldValue(fieldName string, sharedValue interface{}) {
 	setter := fieldSetter{
-		fptr: func() interface{} {
+		fieldAction: func() interface{} {
 			return sharedValue
 		},
 	}
@@ -58,29 +58,16 @@ func (p *Plan) EnsuredFieldValue(fieldName string, sharedValue interface{}) {
 	p.ensuredFields[fieldName] = setter
 }
 
-func (p *Plan) makeDeferredExecute(fac *Factory) deferredExecuteType {
-	return func(iField reflect.Value) func() interface{} {
-		// Extract the type from the slice and assign an instance to the rootType.
-		// I want to go from []examples.Person to example.Person
-		fac.rootType = reflect.New(reflect.TypeOf(iField.Interface()).Elem()).Elem().Interface() // Overwrite the factory with the public field type
-
-		return func() interface{} { // The actual generator
-			result := fac.Execute()
-			return result
-		}
-	}
-}
-
-func (p *Plan) EnsuredDeferredFieldValue(fieldName string, sharedValue interface{}) {
+func (p *Plan) EnsuredFactoryFieldValue(fieldName string, sharedValue interface{}) {
 	setter := fieldSetter{
-		deferredExecute: p.makeDeferredExecute(sharedValue.(*Factory)),
+		factoryAction: makeFactoryAction(sharedValue.(*Factory)),
 	}
 
 	p.ensuredFields[fieldName] = setter
 }
 
 func (p *Plan) SetRunCount(runType RunType, n int) {
-	p.run = PlanRun{
+	p.run = &PlanRun{
 		RunType: runType,
 		Count:   n,
 	}
@@ -135,10 +122,10 @@ func (p *Plan) generateRandomMock(f *Factory) interface{} {
 }
 
 func (p *Plan) getValueGenerator(k reflect.Kind, iField reflect.Value, qualifiedName string) GenType {
-	if p.ensuredFields[qualifiedName].deferredExecute != nil {
-		return p.ensuredFields[qualifiedName].deferredExecute(iField)
-	} else if p.ensuredFields[qualifiedName].fptr != nil {
-		return p.ensuredFields[qualifiedName].fptr
+	if p.ensuredFields[qualifiedName].factoryAction != nil {
+		return p.ensuredFields[qualifiedName].factoryAction(iField)
+	} else if p.ensuredFields[qualifiedName].fieldAction != nil {
+		return p.ensuredFields[qualifiedName].fieldAction
 	}
 
 	return p.generators[k]
@@ -167,8 +154,8 @@ func (p *Plan) updateFieldValue(k reflect.Kind, generator GenType, iField reflec
 
 func (p *Plan) updateSliceFieldValue(generator GenType, iField reflect.Value) {
 	if generator == nil {
-		deferredExecute := p.makeDeferredExecute(Tap())
-		generator = deferredExecute(iField)
+		factoryAction := makeFactoryAction(Tap())
+		generator = factoryAction(iField)
 	}
 
 	factorySlice := generator()
@@ -198,6 +185,19 @@ func (p *Plan) updateStructFieldValue(generator GenType, iField reflect.Value, q
 		results := mock.Execute()
 
 		iField.Set(reflect.ValueOf(results[0]))
+	}
+}
+
+func makeFactoryAction(fac *Factory) FactoryActionType {
+	return func(iField reflect.Value) func() interface{} {
+		// Extract the type from the slice and assign an instance to the rootType.
+		// I want to go from []examples.Person to example.Person
+		fac.rootType = reflect.New(reflect.TypeOf(iField.Interface()).Elem()).Elem().Interface() // Overwrite the factory with the public field type
+
+		return func() interface{} { // The actual generator
+			result := fac.Execute()
+			return result
+		}
 	}
 }
 

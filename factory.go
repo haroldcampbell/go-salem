@@ -30,7 +30,7 @@ func (f *Factory) Ensure(fieldName string, sharedValue interface{}) *Factory {
 
 	switch sharedValue.(type) {
 	case *Factory:
-		f.plan.EnsuredDeferredFieldValue(fieldName, sharedValue)
+		f.plan.EnsuredFactoryFieldValue(fieldName, sharedValue)
 
 	default:
 		f.plan.EnsuredFieldValue(fieldName, sharedValue)
