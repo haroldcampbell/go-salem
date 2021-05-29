@@ -45,6 +45,14 @@ func (f *Factory) Ensure(fieldName string, sharedValue interface{}) *Factory {
 	return f
 }
 
+// EnsureSequence is used to specify the actual values for the fields.
+// The values default to their empty value if the items exceed the number of squence items.
+func (f *Factory) EnsureSequence(fieldName string, seq ...interface{}) *Factory {
+	f.plan.EnsureSequence(fieldName, seq)
+
+	return f
+}
+
 // WithMinItems generates at least n items
 // By default WithMinItems will generated [n, n+10) items. To change the upperBounds
 // specifiy the span.

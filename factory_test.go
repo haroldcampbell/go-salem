@@ -57,6 +57,7 @@ func Test_FactoryEnsure(t *testing.T) {
 	test_nested_ensure(t)
 	test_slice_ensure(t)
 	test_slice_pointer_ensure(t)
+	test_sequence_ensure(t)
 }
 
 func test_simple_ensure(t *testing.T) {
@@ -110,6 +111,25 @@ func test_slice_ensure(t *testing.T) {
 	actualMocks := results[0].(wallet).Notes
 
 	assert.Equal(t, 5, len(actualMocks), "should set nested slice")
+}
+
+func test_sequence_ensure(t *testing.T) {
+	requiredValue := "happiness"
+
+	f := Mock(simple{})
+	f.EnsureSequence("PublicField", "a", requiredValue, "c")
+	f.WithExactItems(5)
+
+	results := f.Execute()
+	publicFields := make([]string, len(results))
+	for i, v := range results {
+		publicFields[i] = v.(simple).PublicField
+	}
+
+	expected := []string{"a", requiredValue, "c", "", ""}
+	actual := []string{publicFields[0], publicFields[1], publicFields[2], publicFields[3], publicFields[4]}
+	assert.Equal(t, requiredValue, publicFields[1], "should be set to sequence value")
+	assert.Equal(t, expected, actual, "should set sequence values")
 }
 
 func Test_FactoryWithItems(t *testing.T) {

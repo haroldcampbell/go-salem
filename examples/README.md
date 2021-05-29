@@ -127,3 +127,17 @@ You can easily omit fields with the `factory.Omit(...)` function.
 ```
 
 See [example 7](./ex-7/main.go).
+
+## Supplying sequences
+
+There are times when you want to supply a secquence of values. This can be done with the `factory.EnsureSequence` function.
+
+```
+	factory := salem.Mock(basic{})
+	factory.EnsureSequence("SKU", "a", "b", "c", "sss").
+		WithExactItems(4)
+
+	results := factory.Execute()
+```
+
+See [example 8](./ex-8/main.go).

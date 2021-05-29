@@ -59,14 +59,14 @@ func (p *Plan) OmitField(fieldName string) {
 
 }
 
-func (p *Plan) EnsuredFieldValue(fieldName string, sharedValue interface{}) {
-	setter := fieldSetter{
-		fieldAction: func() interface{} {
-			return sharedValue
-		},
-	}
+func (p *Plan) AddFieldAction(fieldName string, fieldActionHanlder GenType) {
+	p.ensuredFields[fieldName] = fieldSetter{fieldAction: fieldActionHanlder}
+}
 
-	p.ensuredFields[fieldName] = setter
+func (p *Plan) EnsuredFieldValue(fieldName string, sharedValue interface{}) {
+	p.AddFieldAction(fieldName, func() interface{} {
+		return sharedValue
+	})
 }
 
 func (p *Plan) EnsuredFactoryFieldValue(fieldName string, sharedValue interface{}) {
@@ -75,6 +75,25 @@ func (p *Plan) EnsuredFactoryFieldValue(fieldName string, sharedValue interface{
 	}
 
 	p.ensuredFields[fieldName] = setter
+}
+
+func (p *Plan) EnsureSequence(fieldName string, seq []interface{}) {
+	var index int
+
+	seqHandler := func() interface{} {
+		var val interface{}
+
+		if index < len(seq) {
+			val = seq[index]
+		}
+
+		result := val
+		index += 1
+
+		return result
+	}
+
+	p.AddFieldAction(fieldName, seqHandler)
 }
 
 func (p *Plan) SetRunCount(runType RunType, n int) {
@@ -151,6 +170,15 @@ func (p *Plan) generateRandomMock(f *Factory) interface{} {
 		generator := p.getValueGenerator(k, iField, qualifiedName)
 		val := p.generateFieldValue(k, generator, iField, qualifiedName)
 
+		if !val.IsValid() {
+			// Uncomment to make EnsureSequence() set the values that fall outside of the sequence
+			// if isPrimativeKind(k) {
+			// gen := p.generators[k]
+			// val = reflect.ValueOf(gen())
+			// } else {
+			continue
+			// }
+		}
 		iField.Set(val)
 	}
 	return newMockPtr.Elem().Interface()
