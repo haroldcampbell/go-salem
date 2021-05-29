@@ -98,7 +98,6 @@ func (p *Plan) Run(f *Factory) []interface{} {
 
 func (p *Plan) generateRandomMock(f *Factory) interface{} {
 	v := reflect.ValueOf(f.rootType)
-
 	typeOfT := v.Type()
 
 	// Create an mock instance of the struct
@@ -106,6 +105,16 @@ func (p *Plan) generateRandomMock(f *Factory) interface{} {
 	newElm := newMockPtr.Elem()
 
 	rand.Seed(time.Now().UnixNano())
+
+	if v.Kind() == reflect.Ptr {
+		ptrType := v.Type().Elem()
+
+		newMockPtr = reflect.New(ptrType) // Make an instance based on the pointer type
+		newElm = newMockPtr.Elem()
+
+		v = newElm
+		typeOfT = v.Type()
+	}
 
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i) // Get field in the struct
@@ -119,10 +128,10 @@ func (p *Plan) generateRandomMock(f *Factory) interface{} {
 
 		qualifiedName := distinctFileName(p.parentName, fieldName)
 		generator := p.getValueGenerator(k, iField, qualifiedName)
+		val := p.generateFieldValue(k, generator, iField, qualifiedName)
 
-		p.updateFieldValue(k, generator, iField, qualifiedName)
+		iField.Set(val)
 	}
-
 	return newMockPtr.Elem().Interface()
 }
 
@@ -136,28 +145,43 @@ func (p *Plan) getValueGenerator(k reflect.Kind, iField reflect.Value, qualified
 	return p.generators[k]
 }
 
-func (p *Plan) updateFieldValue(k reflect.Kind, generator GenType, iField reflect.Value, qualifiedName string) {
+func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField reflect.Value, qualifiedName string) reflect.Value {
 	if isPrimativeKind(k) {
 		val := generator()
-		iField.Set(reflect.ValueOf(val))
 
-		return
+		return reflect.ValueOf(val)
 	}
 
 	// Complex Types
 	switch k {
 	case reflect.Slice:
-		p.updateSliceFieldValue(generator, iField)
+		return p.updateSliceFieldValue(generator, iField)
 
 	case reflect.Struct:
-		p.updateStructFieldValue(generator, iField, qualifiedName)
+		return p.updateStructFieldValue(generator, iField, qualifiedName)
+
+	case reflect.Ptr:
+		ptrType := iField.Type().Elem() // The pointer's type
+		ptrK := ptrType.Kind()
+		generator := p.getValueGenerator(ptrK, iField, qualifiedName)
+
+		newMockPtr := reflect.New(ptrType) // Make an instance based on the pointer type
+		newElm := newMockPtr.Elem()
+
+		val := p.generateFieldValue(ptrK, generator, newElm, qualifiedName)
+
+		vp := reflect.New(val.Type())
+		vp.Elem().Set(reflect.ValueOf(val.Interface()))
+
+		return vp
 
 	default:
 		fmt.Printf("[updateFieldValue] (Unknow type) %v \n", iField.Type().Name())
 	}
+	panic("[updateFieldValue] Unsupported type")
 }
 
-func (p *Plan) updateSliceFieldValue(generator GenType, iField reflect.Value) {
+func (p *Plan) updateSliceFieldValue(generator GenType, iField reflect.Value) reflect.Value {
 	if generator == nil {
 		factoryAction := makeFactoryAction(Tap())
 		generator = factoryAction(iField)
@@ -169,28 +193,44 @@ func (p *Plan) updateSliceFieldValue(generator GenType, iField reflect.Value) {
 	newSlice := reflect.MakeSlice(iField.Type(), num, num)
 	unboxedSlized := reflect.ValueOf(factorySlice)
 
+	if iField.Type().Elem().Kind() == reflect.Ptr {
+		for i := 0; i < unboxedSlized.Len(); i++ {
+			obj := unboxedSlized.Index(i).Elem()
+			newSlice.Index(i).Set(toPtr(obj))
+		}
+		return newSlice
+	}
+
 	for i := 0; i < unboxedSlized.Len(); i++ {
 		newSlice.Index(i).Set(unboxedSlized.Index(i).Elem())
 	}
 
-	iField.Set(newSlice)
+	return newSlice
 }
 
-func (p *Plan) updateStructFieldValue(generator GenType, iField reflect.Value, qualifiedName string) {
+// toPtr converts obj to *obj
+func toPtr(obj reflect.Value) reflect.Value {
+	vp := reflect.New(reflect.TypeOf(obj.Interface()))
+	vp.Elem().Set(reflect.ValueOf(obj.Interface()))
+
+	return vp
+}
+
+func (p *Plan) updateStructFieldValue(generator GenType, iField reflect.Value, qualifiedName string) reflect.Value {
 	if generator != nil {
 		val := generator()
-		iField.Set(reflect.ValueOf(val))
-	} else {
-		iField.Interface()
-		mock := Mock(iField.Interface())
-
-		mock.plan.parentName = qualifiedName
-		mock.plan.CopyParentRequiredFields(p)
-
-		results := mock.Execute()
-
-		iField.Set(reflect.ValueOf(results[0]))
+		return reflect.ValueOf(val)
 	}
+
+	iField.Interface()
+	mock := Mock(iField.Interface())
+
+	mock.plan.parentName = qualifiedName
+	mock.plan.CopyParentRequiredFields(p)
+
+	results := mock.Execute()
+
+	return reflect.ValueOf(results[0])
 }
 
 func makeFactoryAction(fac *Factory) FactoryActionType {
