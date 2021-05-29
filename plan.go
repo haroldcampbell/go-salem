@@ -224,10 +224,13 @@ func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField refl
 
 		return vp
 
+	case reflect.Interface:
+		return reflect.ValueOf(nil)
+
 	default:
 		fmt.Printf("[updateFieldValue] (Unknow type) %v \n", iField.Type().Name())
 	}
-	panic("[updateFieldValue] Unsupported type")
+	panic(fmt.Sprintf("[updateFieldValue] Unsupported type: %#v kind:%v", iField, k))
 }
 
 func (p *Plan) updateSliceFieldValue(generator GenType, iField reflect.Value) reflect.Value {
