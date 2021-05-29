@@ -29,7 +29,7 @@ func simple() {
 	results := factory.Execute()
 
 	str := utils.PrettyMongoString(results)
-	fmt.Printf("Salem mocks:\n%v\n\n", str)
+	fmt.Printf("Slices simple mocks:\n%v\n\n", str)
 }
 
 func nested() {
@@ -40,5 +40,5 @@ func nested() {
 	results := factory.Execute()
 
 	str := utils.PrettyMongoString(results)
-	fmt.Printf("Salem mocks:\n%v\n\n", str)
+	fmt.Printf("Slices nested mocks:\n%v\n\n", str)
 }

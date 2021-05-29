@@ -9,7 +9,7 @@ import (
 )
 
 // Nested Properties Example
-// Setting the properties of nested structs
+// Setting the properties of nested fields
 //
 // Nested public fields can be access by using `.` as a path inidicator.
 //
