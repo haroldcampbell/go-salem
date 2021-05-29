@@ -33,8 +33,8 @@ type Plan struct {
 
 	run *PlanRun
 
-	deferredRun func()
-	parentName  string
+	evalItemCountAction func()
+	parentName          string
 }
 
 func NewPlan() *Plan {
@@ -46,6 +46,10 @@ func NewPlan() *Plan {
 	p.initDefaultGenerators()
 
 	return p
+}
+
+func (p *Plan) SetItemCountHandler(handler func()) {
+	p.evalItemCountAction = handler
 }
 
 func (p *Plan) EnsuredFieldValue(fieldName string, sharedValue interface{}) {
@@ -80,7 +84,8 @@ func (p *Plan) CopyParentRequiredFields(pp *Plan) {
 }
 
 func (p *Plan) Run(f *Factory) []interface{} {
-	p.deferredRun()
+	rand.Seed(time.Now().UnixNano())
+	p.evalItemCountAction()
 
 	items := make([]interface{}, 0)
 
