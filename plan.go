@@ -28,6 +28,7 @@ type fieldSetter struct {
 	factoryAction FactoryActionType
 }
 type Plan struct {
+	omittedFields map[string]bool        // ignore these fields
 	ensuredFields map[string]fieldSetter // fields set via ensure
 	generators    map[reflect.Kind]func() interface{}
 
@@ -40,6 +41,7 @@ type Plan struct {
 func NewPlan() *Plan {
 	p := &Plan{}
 
+	p.omittedFields = make(map[string]bool)
 	p.ensuredFields = make(map[string]fieldSetter)
 	p.generators = make(map[reflect.Kind]func() interface{})
 
@@ -50,6 +52,11 @@ func NewPlan() *Plan {
 
 func (p *Plan) SetItemCountHandler(handler func()) {
 	p.evalItemCountAction = handler
+}
+
+func (p *Plan) OmitField(fieldName string) {
+	p.omittedFields[fieldName] = true
+
 }
 
 func (p *Plan) EnsuredFieldValue(fieldName string, sharedValue interface{}) {
@@ -77,9 +84,13 @@ func (p *Plan) SetRunCount(runType RunType, n int) {
 	}
 }
 
-func (p *Plan) CopyParentRequiredFields(pp *Plan) {
+func (p *Plan) CopyParentConstraints(pp *Plan) {
 	for k, v := range pp.ensuredFields {
 		p.ensuredFields[k] = v
+	}
+
+	for k, v := range pp.omittedFields {
+		p.omittedFields[k] = v
 	}
 }
 
@@ -97,14 +108,14 @@ func (p *Plan) Run(f *Factory) []interface{} {
 }
 
 func (p *Plan) generateRandomMock(f *Factory) interface{} {
+	rand.Seed(time.Now().UnixNano())
+
 	v := reflect.ValueOf(f.rootType)
 	typeOfT := v.Type()
 
 	// Create an mock instance of the struct
 	newMockPtr := reflect.New(typeOfT)
 	newElm := newMockPtr.Elem()
-
-	rand.Seed(time.Now().UnixNano())
 
 	if v.Kind() == reflect.Ptr {
 		ptrType := v.Type().Elem()
@@ -133,6 +144,10 @@ func (p *Plan) generateRandomMock(f *Factory) interface{} {
 		}
 
 		qualifiedName := distinctFileName(p.parentName, fieldName)
+		if p.omittedFields[qualifiedName] == true {
+			continue // Skip omitted fields
+		}
+
 		generator := p.getValueGenerator(k, iField, qualifiedName)
 		val := p.generateFieldValue(k, generator, iField, qualifiedName)
 
@@ -232,7 +247,7 @@ func (p *Plan) updateStructFieldValue(generator GenType, iField reflect.Value, q
 	mock := Mock(iField.Interface())
 
 	mock.plan.parentName = qualifiedName
-	mock.plan.CopyParentRequiredFields(p)
+	mock.plan.CopyParentConstraints(p)
 
 	results := mock.Execute()
 

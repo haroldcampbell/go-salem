@@ -38,6 +38,20 @@ type vault struct {
 	Notes []*money
 }
 
+func Test_FactoryOmit(t *testing.T) {
+	f := Mock(school{})
+
+	results := f.Execute()
+	actualMock := results[0].(school)
+	assert.NotEmpty(t, actualMock.NextOfKin, "expect field to be set")
+
+	f.Omit("NextOfKin")
+	results = f.Execute()
+	actualMock = results[0].(school)
+
+	assert.Empty(t, actualMock.NextOfKin, "expect field to be empty")
+}
+
 func Test_FactoryEnsure(t *testing.T) {
 	test_simple_ensure(t)
 	test_nested_ensure(t)

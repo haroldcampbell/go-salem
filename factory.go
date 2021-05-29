@@ -24,6 +24,13 @@ func (f *Factory) Execute() []interface{} {
 	return f.plan.Run(f)
 }
 
+// Omit fields with the specifed name
+func (f *Factory) Omit(fieldName string) *Factory {
+	f.plan.OmitField(fieldName)
+
+	return f
+}
+
 // Ensure sets the value of the fields we don't want to randomly generate
 func (f *Factory) Ensure(fieldName string, sharedValue interface{}) *Factory {
 
