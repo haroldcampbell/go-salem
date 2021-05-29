@@ -2,6 +2,7 @@ package salem
 
 import (
 	"math/rand"
+	"reflect"
 )
 
 type nilStruct struct {
@@ -22,6 +23,26 @@ func Tap() *Factory {
 // Execute execute the factory instructions to generate the mocks
 func (f *Factory) Execute() []interface{} {
 	return f.plan.Run(f)
+}
+
+// ExecuteToType returns a slice that tis the same type as the Mock's parameter.
+//
+// This allows easy typecasting into the underlying mocks type.
+// Example:
+// 		factory := salem.Mock(examples.Person{}).WithExactItems(5)
+// 		target := factory.ExecuteToType().([]examples.Person) //<- we can do this
+func (f *Factory) ExecuteToType() interface{} {
+	results := f.plan.Run(f)
+
+	slice := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(f.rootType)), len(results), len(results))
+
+	for i, s := range results {
+		c := reflect.ValueOf(s)
+
+		slice.Index(i).Set(c)
+	}
+
+	return slice.Interface()
 }
 
 // Omit fields with the specifed name

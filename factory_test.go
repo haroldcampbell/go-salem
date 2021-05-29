@@ -53,11 +53,24 @@ func Test_FactoryOmit(t *testing.T) {
 }
 
 func Test_FactoryEnsure(t *testing.T) {
+	test_execute(t)
 	test_simple_ensure(t)
 	test_nested_ensure(t)
 	test_slice_ensure(t)
 	test_slice_pointer_ensure(t)
 	test_sequence_ensure(t)
+}
+
+func test_execute(t *testing.T) {
+	f := Mock(simple{})
+	results := f.Execute()
+
+	assert.Equal(t, 1, len(results), "expect Execute() to create array")
+	assert.IsType(t, []interface{}{}, results, "expect Execute() to return []interface{}")
+
+	targetReuslt := f.ExecuteToType().([]simple)
+	assert.Equal(t, 1, len(targetReuslt), "expect ExecuteToType() to create array")
+	assert.IsType(t, []simple{}, targetReuslt, "expect ExecuteToType() to return interface{} that is a slice of base type")
 }
 
 func test_simple_ensure(t *testing.T) {

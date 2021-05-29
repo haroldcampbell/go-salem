@@ -141,3 +141,14 @@ There are times when you want to supply a secquence of values. This can be done 
 ```
 
 See [example 8](./ex-8/main.go).
+
+## Casting to target slices
+
+Cast results into a target types is also possible without the need to write additional copying code.
+
+```
+	factory := salem.Mock(examples.Person{}).WithExactItems(5)
+	target := factory.ExecuteToType().([]examples.Person)
+```
+
+See [example 9](./ex-9/main.go).
