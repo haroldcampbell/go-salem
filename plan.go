@@ -116,6 +116,12 @@ func (p *Plan) generateRandomMock(f *Factory) interface{} {
 		typeOfT = v.Type()
 	}
 
+	if isPrimativeKind(v.Kind()) {
+		generator := p.generators[v.Kind()]
+		val := generator()
+		return val
+	}
+
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i) // Get field in the struct
 		k := field.Kind()
