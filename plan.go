@@ -27,15 +27,23 @@ type fieldSetter struct {
 	fieldAction   GenType
 	factoryAction FactoryActionType
 }
+
+// type fieldConstaintSetter struct {
+// fieldConstraintAction func(field interface{}) bool
+// }
+
 type Plan struct {
-	omittedFields map[string]bool        // ignore these fields
-	ensuredFields map[string]fieldSetter // fields set via ensure
-	generators    map[reflect.Kind]func() interface{}
+	omittedFields     map[string]bool            // ignore these fields
+	ensuredFields     map[string]fieldSetter     // fields set via ensure
+	constrainedFields map[string]FieldConstraint // fields constraints
+	generators        map[reflect.Kind]func() interface{}
 
 	run *PlanRun
 
 	evalItemCountAction func()
 	parentName          string
+
+	maxConstraintRetryAttempts int
 }
 
 func NewPlan() *Plan {
@@ -43,11 +51,17 @@ func NewPlan() *Plan {
 
 	p.omittedFields = make(map[string]bool)
 	p.ensuredFields = make(map[string]fieldSetter)
+	p.constrainedFields = make(map[string]FieldConstraint)
 	p.generators = make(map[reflect.Kind]func() interface{})
+	p.maxConstraintRetryAttempts = SuggestedConstraintRetryAttempts
 
 	p.initDefaultGenerators()
 
 	return p
+}
+
+func (p *Plan) SetMaxConstraintsRetryAttempts(maxRetries int) {
+	p.maxConstraintRetryAttempts = maxRetries
 }
 
 func (p *Plan) SetItemCountHandler(handler func()) {
@@ -67,6 +81,10 @@ func (p *Plan) EnsuredFieldValue(fieldName string, sharedValue interface{}) {
 	p.AddFieldAction(fieldName, func() interface{} {
 		return sharedValue
 	})
+}
+
+func (p *Plan) EnsuredFieldValueConstraint(fieldName string, constraint FieldConstraint) {
+	p.constrainedFields[fieldName] = constraint
 }
 
 func (p *Plan) EnsuredFactoryFieldValue(fieldName string, sharedValue interface{}) {
@@ -167,8 +185,7 @@ func (p *Plan) generateRandomMock(f *Factory) interface{} {
 			continue // Skip omitted fields
 		}
 
-		generator := p.getValueGenerator(k, iField, qualifiedName)
-		val := p.generateFieldValue(k, generator, iField, qualifiedName)
+		val := p.generateValue(k, iField, qualifiedName)
 
 		if !val.IsValid() {
 			// Uncomment to make EnsureSequence() set the values that fall outside of the sequence
@@ -182,6 +199,42 @@ func (p *Plan) generateRandomMock(f *Factory) interface{} {
 		iField.Set(val)
 	}
 	return newMockPtr.Elem().Interface()
+}
+func (p *Plan) generateValue(k reflect.Kind, iField reflect.Value, qualifiedName string) reflect.Value {
+	constraint := p.constrainedFields[qualifiedName]
+	generator := p.getValueGenerator(k, iField, qualifiedName)
+
+	if constraint == nil {
+		return p.generateFieldValue(k, generator, iField, qualifiedName)
+	}
+
+	isValueFromEnsureAction := p.ensuredFields[qualifiedName].factoryAction != nil || p.ensuredFields[qualifiedName].fieldAction != nil
+
+	if isValueFromEnsureAction {
+		val := p.generateFieldValue(k, generator, iField, qualifiedName)
+		if !constraint.IsValid(val.Interface()) {
+			panic(fmt.Sprintf("Constraint clashes with one of your Ensure methods. Invalid FieldConstraint for field '%v'. Constraint: %#v.", qualifiedName, constraint))
+		}
+		return val
+	}
+
+	var val reflect.Value
+	var attempt = 0
+
+	for {
+		val = p.generateFieldValue(k, generator, iField, qualifiedName)
+		attempt += 1
+
+		if constraint.IsValid(val.Interface()) {
+			break
+		}
+
+		if attempt > p.maxConstraintRetryAttempts {
+			panic(fmt.Sprintf("Unable to meet constraint %v after '%v' tries", constraint, p.maxConstraintRetryAttempts))
+		}
+	}
+
+	return val
 }
 
 func (p *Plan) getValueGenerator(k reflect.Kind, iField reflect.Value, qualifiedName string) GenType {
@@ -197,7 +250,6 @@ func (p *Plan) getValueGenerator(k reflect.Kind, iField reflect.Value, qualified
 func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField reflect.Value, qualifiedName string) reflect.Value {
 	if isPrimativeKind(k) {
 		val := generator()
-
 		return reflect.ValueOf(val)
 	}
 

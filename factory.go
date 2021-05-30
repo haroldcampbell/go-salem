@@ -20,6 +20,11 @@ func Tap() *Factory {
 	return nestedFactory
 }
 
+// Plan return a point to the current plan
+func (f *Factory) Plan() *Plan {
+	return f.plan
+}
+
 // Execute execute the factory instructions to generate the mocks
 func (f *Factory) Execute() []interface{} {
 	return f.plan.Run(f)
@@ -62,6 +67,21 @@ func (f *Factory) Ensure(fieldName string, sharedValue interface{}) *Factory {
 	default:
 		f.plan.EnsuredFieldValue(fieldName, sharedValue)
 	}
+
+	return f
+}
+
+// EnsureConstraint set a constraint that limits the generated value.
+//
+// The constraint panics if there is an f.Ensure(...) which generates a value resulting in a false constraint
+//
+// Alternatively, the method also fails after trying to generate a constraint after
+// several attempts.
+//
+// The default attempts is defined by SuggestedConstraintRetryAttempts.
+// Use f.Plan().SetMaxConstraintsRetryAttempts(...) the change the number of retry attempts.
+func (f *Factory) EnsureConstraint(fieldName string, constraint FieldConstraint) *Factory {
+	f.plan.EnsuredFieldValueConstraint(fieldName, constraint)
 
 	return f
 }

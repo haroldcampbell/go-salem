@@ -152,3 +152,17 @@ Cast results into a target types is also possible without the need to write addi
 ```
 
 See [example 9](./ex-9/main.go).
+
+## Constrained string fields
+
+Salem allows you generate a values that falls within bounds set by `ConstrainStringLength(min, max)`.
+
+```
+	factory := salem.Mock(examples.Person{}).
+		EnsureConstraint("FName", salem.ConstrainStringLength(4, 10)).
+		EnsureConstraint("Surname", salem.ConstrainStringLength(4, 10)).
+		WithExactItems(5)
+
+```
+
+See [example 10](./ex-10/main.go).
