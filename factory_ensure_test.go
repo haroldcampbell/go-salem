@@ -1,6 +1,7 @@
-package salem
+package salem_test
 
 import (
+	"go-salem"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ func Test_FactoryEnsure(t *testing.T) {
 func test_simple_ensure(t *testing.T) {
 	requiredValue := "happiness"
 
-	f := Mock(simple{})
+	f := salem.Mock(simple{})
 	f.Ensure("num", 101)
 	f.Ensure("PublicField", requiredValue)
 
@@ -48,7 +49,7 @@ func test_nested_ensure(t *testing.T) {
 
 	requiredValue := "Goose BrightSpark"
 
-	f := Mock(basicParent{})
+	f := salem.Mock(basicParent{})
 	f.Ensure("Child.ParentName", requiredValue)
 	f.Ensure("Child.Attends.NextOfKin", requiredValue)
 
@@ -64,9 +65,9 @@ func test_slice_pointer_ensure(t *testing.T) {
 		Notes []*money
 	}
 
-	tap := Tap().WithExactItems(5)
+	tap := salem.Tap().WithExactItems(5)
 
-	f := Mock(vault{})
+	f := salem.Mock(vault{})
 	f.Ensure("Notes", tap)
 
 	results := f.Execute()
@@ -80,9 +81,9 @@ func test_slice_ensure(t *testing.T) {
 		Notes []money
 	}
 
-	tap := Tap().WithExactItems(5)
+	tap := salem.Tap().WithExactItems(5)
 
-	f := Mock(wallet{})
+	f := salem.Mock(wallet{})
 	f.Ensure("Notes", tap)
 
 	results := f.Execute()
@@ -94,7 +95,7 @@ func test_slice_ensure(t *testing.T) {
 func test_sequence_ensure(t *testing.T) {
 	requiredValue := "happiness"
 
-	f := Mock(simple{})
+	f := salem.Mock(simple{})
 	f.EnsureSequence("PublicField", "a", requiredValue, "c")
 	f.WithExactItems(5)
 

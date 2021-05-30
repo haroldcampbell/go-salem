@@ -8,7 +8,7 @@ import (
 )
 
 type RunType uint
-type FactoryActionType func(reflect.Value) GenType
+type FactoryActionType func(reflect.Value, string) GenType
 
 const (
 	Invalid RunType = iota
@@ -59,7 +59,9 @@ func NewPlan() *Plan {
 
 	return p
 }
-
+func (p *Plan) GetPlanRun() *PlanRun {
+	return p.run
+}
 func (p *Plan) SetMaxConstraintsRetryAttempts(maxRetries int) {
 	p.maxConstraintRetryAttempts = maxRetries
 }
@@ -89,7 +91,7 @@ func (p *Plan) EnsuredFieldValueConstraint(fieldName string, constraint FieldCon
 
 func (p *Plan) EnsuredFactoryFieldValue(fieldName string, sharedValue interface{}) {
 	setter := fieldSetter{
-		factoryAction: makeFactoryAction(sharedValue.(*Factory)),
+		factoryAction: makeFactoryAction(sharedValue.(*Factory), p),
 	}
 
 	p.ensuredFields[fieldName] = setter
@@ -239,7 +241,7 @@ func (p *Plan) generateValue(k reflect.Kind, iField reflect.Value, qualifiedName
 
 func (p *Plan) getValueGenerator(k reflect.Kind, iField reflect.Value, qualifiedName string) GenType {
 	if p.ensuredFields[qualifiedName].factoryAction != nil {
-		return p.ensuredFields[qualifiedName].factoryAction(iField)
+		return p.ensuredFields[qualifiedName].factoryAction(iField, qualifiedName)
 	} else if p.ensuredFields[qualifiedName].fieldAction != nil {
 		return p.ensuredFields[qualifiedName].fieldAction
 	}
@@ -256,7 +258,7 @@ func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField refl
 	// Complex Types
 	switch k {
 	case reflect.Slice:
-		return p.updateSliceFieldValue(generator, iField)
+		return p.updateSliceFieldValue(generator, iField, qualifiedName)
 
 	case reflect.Struct:
 		return p.updateStructFieldValue(generator, iField, qualifiedName)
@@ -285,10 +287,10 @@ func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField refl
 	panic(fmt.Sprintf("[updateFieldValue] Unsupported type: %#v kind:%v", iField, k))
 }
 
-func (p *Plan) updateSliceFieldValue(generator GenType, iField reflect.Value) reflect.Value {
+func (p *Plan) updateSliceFieldValue(generator GenType, iField reflect.Value, qualifiedName string) reflect.Value {
 	if generator == nil {
-		factoryAction := makeFactoryAction(Tap())
-		generator = factoryAction(iField)
+		factoryAction := makeFactoryAction(Tap(), p)
+		generator = factoryAction(iField, qualifiedName)
 	}
 
 	factorySlice := generator()
@@ -337,13 +339,16 @@ func (p *Plan) updateStructFieldValue(generator GenType, iField reflect.Value, q
 	return reflect.ValueOf(results[0])
 }
 
-func makeFactoryAction(fac *Factory) FactoryActionType {
-	return func(iField reflect.Value) func() interface{} {
+func makeFactoryAction(fac *Factory, currentPlan *Plan) FactoryActionType {
+	return func(iField reflect.Value, qualifiedName string) func() interface{} {
 		// Extract the type from the slice and assign an instance to the rootType.
 		// I want to go from []examples.Person to example.Person
 		fac.rootType = reflect.New(reflect.TypeOf(iField.Interface()).Elem()).Elem().Interface() // Overwrite the factory with the public field type
 
 		return func() interface{} { // The actual generator
+			fac.plan.parentName = qualifiedName
+			fac.plan.CopyParentConstraints(currentPlan)
+
 			result := fac.Execute()
 			return result
 		}

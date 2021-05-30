@@ -1,6 +1,7 @@
-package salem
+package salem_test
 
 import (
+	"go-salem"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,7 +34,7 @@ func test_constrained_ensure(t *testing.T) {
 	assert.False(t, tc.didCallIsValid)
 	assert.Empty(t, tc.actualField)
 
-	f := Mock(human{})
+	f := salem.Mock(human{})
 	f.EnsureConstraint("Name", tc)
 	f.Execute()
 
@@ -48,9 +49,9 @@ func test_constraint_clash_with_ensure(t *testing.T) {
 	type human struct {
 		Name string
 	}
-	f := Mock(human{})
+	f := salem.Mock(human{})
 	f.Ensure("Name", "xxxxx xxxxx xxxxx xxxxx xxxxx yyyy") // This is clashes with the maxBound and should cause a panic
-	f.EnsureConstraint("Name", ConstrainStringLength(minBound, maxBound))
+	f.EnsureConstraint("Name", salem.ConstrainStringLength(minBound, maxBound))
 
 	assert.Panics(t, func() {
 		f.Execute()
@@ -64,8 +65,8 @@ func test_string_constrained_ensure(t *testing.T) {
 	}
 	minBound := 4
 	maxBound := 20
-	f := Mock(human{})
-	f.EnsureConstraint("Name", ConstrainStringLength(minBound, maxBound))
+	f := salem.Mock(human{})
+	f.EnsureConstraint("Name", salem.ConstrainStringLength(minBound, maxBound))
 
 	results := f.Execute()
 	actualMock := results[0].(human)

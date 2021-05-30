@@ -20,8 +20,8 @@ func Tap() *Factory {
 	return nestedFactory
 }
 
-// Plan return a point to the current plan
-func (f *Factory) Plan() *Plan {
+// GetPlan return a point to the current plan
+func (f *Factory) GetPlan() *Plan {
 	return f.plan
 }
 
@@ -79,7 +79,7 @@ func (f *Factory) Ensure(fieldName string, sharedValue interface{}) *Factory {
 // several attempts.
 //
 // The default attempts is defined by SuggestedConstraintRetryAttempts.
-// Use f.Plan().SetMaxConstraintsRetryAttempts(...) the change the number of retry attempts.
+// Use f.GetPlan().SetMaxConstraintsRetryAttempts(...) the change the number of retry attempts.
 func (f *Factory) EnsureConstraint(fieldName string, constraint FieldConstraint) *Factory {
 	f.plan.EnsuredFieldValueConstraint(fieldName, constraint)
 

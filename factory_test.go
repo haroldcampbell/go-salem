@@ -1,6 +1,7 @@
-package salem
+package salem_test
 
 import (
+	"go-salem"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ type school struct {
 }
 
 func Test_Factory(t *testing.T) {
-	f := Mock(simple{})
+	f := salem.Mock(simple{})
 	results := f.Execute()
 
 	assert.Equal(t, 1, len(results), "expect Execute() to create array")
@@ -29,7 +30,7 @@ func Test_Factory(t *testing.T) {
 }
 
 func Test_FactoryOmit(t *testing.T) {
-	f := Mock(school{})
+	f := salem.Mock(school{})
 
 	results := f.Execute()
 	actualMock := results[0].(school)
@@ -50,37 +51,37 @@ func Test_FactoryWithItems(t *testing.T) {
 }
 
 func test_with__items(t *testing.T) {
-	f := Mock(empty{})
-	assert.Nil(t, f.plan.run, "expect plan.run to be nil before Execute")
+	f := salem.Mock(empty{})
+	assert.Nil(t, f.GetPlan().GetPlanRun(), "expect plan.run to be nil before Execute")
 }
 func test_with_exact_items(t *testing.T) {
-	f := Mock(empty{})
+	f := salem.Mock(empty{})
 
 	f.WithExactItems(2)
-	assert.Nil(t, f.plan.run, "expect WithExactItems to not change plan.run")
+	assert.Nil(t, f.GetPlan().GetPlanRun(), "expect WithExactItems to not change plan.run")
 
 	f.Execute()
-	assert.Equal(t, ExactRun, f.plan.run.RunType, "expect ExactRun from WithExactItems")
-	assert.Equal(t, 2, f.plan.run.Count, "expect correct run count from WithExactItems")
+	assert.Equal(t, salem.ExactRun, f.GetPlan().GetPlanRun().RunType, "expect ExactRun from WithExactItems")
+	assert.Equal(t, 2, f.GetPlan().GetPlanRun().Count, "expect correct run count from WithExactItems")
 }
 
 func test_with_min_items(t *testing.T) {
-	f := Mock(empty{})
+	f := salem.Mock(empty{})
 
 	f.WithMinItems(2)
-	assert.Nil(t, f.plan.run, "expect WithMinItems to not change plan.run")
+	assert.Nil(t, f.GetPlan().GetPlanRun(), "expect WithMinItems to not change plan.run")
 
 	f.Execute()
-	assert.Equal(t, MinRun, f.plan.run.RunType, "expect MinRun from WithMinItems")
-	assert.GreaterOrEqual(t, f.plan.run.Count, 2, "expect Count to be 2 or more")
+	assert.Equal(t, salem.MinRun, f.GetPlan().GetPlanRun().RunType, "expect MinRun from WithMinItems")
+	assert.GreaterOrEqual(t, f.GetPlan().GetPlanRun().Count, 2, "expect Count to be 2 or more")
 }
 
 func test_with_max_items(t *testing.T) {
-	f := Mock(empty{})
+	f := salem.Mock(empty{})
 
 	f.WithMaxItems(2) // No need to test the run.Count as it will be based on a random value of n
-	assert.Nil(t, f.plan.run, "expect WithMaxItems to not change plan.run")
+	assert.Nil(t, f.GetPlan().GetPlanRun(), "expect WithMaxItems to not change plan.run")
 
 	f.Execute()
-	assert.Equal(t, MaxRun, f.plan.run.RunType, "expect MaxRun from WithExactItems")
+	assert.Equal(t, salem.MaxRun, f.GetPlan().GetPlanRun().RunType, "expect MaxRun from WithExactItems")
 }

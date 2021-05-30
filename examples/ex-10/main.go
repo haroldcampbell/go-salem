@@ -12,7 +12,7 @@ import (
 // Salem will try to generate a value that falls within the bounds.
 //
 // The default attempts is defined by salem.SuggestedConstraintRetryAttempts.
-// Use factory.Plan().SetMaxConstraintsRetryAttempts(...) the change the number of retry attempts.
+// Use factory.GetPlan().SetMaxConstraintsRetryAttempts(...) the change the number of retry attempts.
 
 func main() {
 	factory := salem.Mock(examples.Person{}).
