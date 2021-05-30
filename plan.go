@@ -294,10 +294,9 @@ func (p *Plan) updateSliceFieldValue(generator GenType, iField reflect.Value, qu
 	}
 
 	factorySlice := generator()
-	num := len(factorySlice.([]interface{}))
-
-	newSlice := reflect.MakeSlice(iField.Type(), num, num)
 	unboxedSlized := reflect.ValueOf(factorySlice)
+	num := unboxedSlized.Len()
+	newSlice := reflect.MakeSlice(iField.Type(), num, num)
 
 	if iField.Type().Elem().Kind() == reflect.Ptr {
 		for i := 0; i < unboxedSlized.Len(); i++ {

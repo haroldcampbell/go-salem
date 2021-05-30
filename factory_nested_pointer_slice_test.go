@@ -74,12 +74,18 @@ func Test_FactoryNestedPointerSlice(t *testing.T) {
 		Ensure("ProjectGUID", mockProjectGUID).
 		ExecuteToType().([]datastoreCellModel)[0]
 
-	// test := salem.Mock(placeHolder{}). // <- [BUG] Shouldn't need the wrapper
-	// 					Ensure("Inside", salem.Tap().
-	// 						Ensure("Cell", dc1).
-	// 						Ensure("ColumnAggregates.Cell", dc1)).
-	// 					ExecuteToType().([]placeHolder)
-	// mockGroupByColumns := test[0].Inside
+	test := salem.Mock(placeHolder{}). // <- [BUG] Shouldn't need the wrapper
+						Ensure("Inside", salem.Tap().
+							Ensure("Inside.Cell", dc1).
+							Ensure("Inside.ColumnAggregates.Cell", dc1)).
+						ExecuteToType().([]placeHolder)
+	mockGroupByColumns := test[0].Inside
+
+	// str := utils.PrettyMongoString(mockGroupByColumns)
+	// fmt.Printf("mockGroupByColumns: %v\n", str)
+
+	assert.Equal(t, dc1, mockGroupByColumns[0].Cell)
+	assert.Equal(t, dc1, mockGroupByColumns[0].ColumnAggregates[0].Cell)
 
 	mockDataGroupModel := salem.Mock(dataGroupModel{}).
 		Ensure("GUID", mockDataGroupGUID).
@@ -92,11 +98,7 @@ func Test_FactoryNestedPointerSlice(t *testing.T) {
 		Ensure("FilterColumns.Cell", dc1).
 		Ensure("AggregatedColumns.GUID", "@@@@@"). // DELETE THIS LINE
 		Ensure("AggregatedColumns.Cell", dc1).
-		// Ensure("GroupByColumns", mockGroupByColumns). //<- [BUG] This shouldn't fail.
-		// // Omit("FilterColumns").
-		// Omit("AggregatedColumns").
-		// Omit("GroupByColumns").
-		// Omit("FilterItems").
+		Ensure("GroupByColumns", mockGroupByColumns). //<- [BUG] This shouldn't fail.
 		ExecuteToType().([]dataGroupModel)[0]
 
 	// str := utils.PrettyMongoString(mockDataGroupModel)
@@ -114,4 +116,8 @@ func Test_FactoryNestedPointerSlice(t *testing.T) {
 
 	assert.Equal(t, "@@@@@", mockDataGroupModel.AggregatedColumns[0].GUID)
 	assert.Equal(t, dc1, mockDataGroupModel.AggregatedColumns[0].Cell)
+
+	assert.Equal(t, mockGroupByColumns, mockDataGroupModel.GroupByColumns)
+	assert.Equal(t, dc1, mockDataGroupModel.GroupByColumns[0].Cell)
+	assert.Equal(t, dc1, mockDataGroupModel.GroupByColumns[0].ColumnAggregates[0].Cell)
 }
