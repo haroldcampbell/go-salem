@@ -74,35 +74,30 @@ func Test_FactoryNestedPointerSlice(t *testing.T) {
 		Ensure("ProjectGUID", mockProjectGUID).
 		ExecuteToType().([]datastoreCellModel)[0]
 
-	test := salem.Mock(placeHolder{}). // <- [BUG] Shouldn't need the wrapper
-						Ensure("Inside", salem.Tap().
-							Ensure("Inside.Cell", dc1).
-							Ensure("Inside.ColumnAggregates.Cell", dc1)).
-						ExecuteToType().([]placeHolder)
-	mockGroupByColumns := test[0].Inside
-
-	// str := utils.PrettyMongoString(mockGroupByColumns)
-	// fmt.Printf("mockGroupByColumns: %v\n", str)
+	mockGroupByColumns := salem.Mock(&groupByColumn{}).
+		Ensure("Cell", dc1).
+		Ensure("ColumnAggregates.Cell", dc1).
+		ExecuteToType().([]*groupByColumn)
 
 	assert.Equal(t, dc1, mockGroupByColumns[0].Cell)
 	assert.Equal(t, dc1, mockGroupByColumns[0].ColumnAggregates[0].Cell)
 
 	mockDataGroupModel := salem.Mock(dataGroupModel{}).
 		Ensure("GUID", mockDataGroupGUID).
-		EnsureConstraint("GroupName", salem.ConstrainStringLength(1, 39)). // <- will need an unhappy path to test this
+		EnsureConstraint("GroupName", salem.ConstrainStringLength(1, 39)).
 		Ensure("ProjectGUID", mockProjectGUID).
 		Ensure("Datastore.ProjectGUID", mockProjectGUID).
 		Ensure("Datastore.GUID", mockDatastoreGUID).
 		Ensure("Datastore.ResourceName", "R101").
-		Ensure("FilterColumns.GUID", mockFilterColumnsGUID). // THIS ISN"T BEING RESPECTED
+		Ensure("FilterColumns.GUID", mockFilterColumnsGUID).
 		Ensure("FilterColumns.Cell", dc1).
-		Ensure("AggregatedColumns.GUID", "@@@@@"). // DELETE THIS LINE
+		Ensure("AggregatedColumns.GUID", "@@@@@").
 		Ensure("AggregatedColumns.Cell", dc1).
-		Ensure("GroupByColumns", mockGroupByColumns). //<- [BUG] This shouldn't fail.
+		Ensure("GroupByColumns", mockGroupByColumns).
 		ExecuteToType().([]dataGroupModel)[0]
 
-	// str := utils.PrettyMongoString(mockDataGroupModel)
-	// fmt.Printf("mockDataGroupModel: %v\n", str)
+	// // str := utils.PrettyMongoString(mockDataGroupModel)
+	// // fmt.Printf("mockDataGroupModel: %v\n", str)
 
 	assert.Equal(t, mockDataGroupGUID, mockDataGroupModel.GUID)
 	assert.Equal(t, mockProjectGUID, mockDataGroupModel.ProjectGUID)

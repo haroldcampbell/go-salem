@@ -41,6 +41,21 @@ func (f *Factory) ExecuteToType() interface{} {
 
 	slice := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(f.rootType)), len(results), len(results))
 
+	rt := reflect.TypeOf(f.rootType)
+
+	if rt.Kind() == reflect.Ptr { // For the when Mock is given a pointer. Eg salem.Mock(&groupByColumn{})
+		for i, s := range results {
+			// Convert the value to a pointer
+			ps := reflect.New(reflect.TypeOf(s))
+			c := reflect.ValueOf(s)
+			ps.Elem().Set(c)
+			// Since we are dealing with a pointer slice
+			slice.Index(i).Set(ps)
+		}
+
+		return slice.Interface()
+	}
+
 	for i, s := range results {
 		c := reflect.ValueOf(s)
 
