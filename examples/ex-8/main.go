@@ -12,6 +12,7 @@ type basic struct {
 
 // Sequences Example
 // An example where you can specify the actual values for the fields
+// The sequence items are chosen based on the item index
 
 func main() {
 	factory := salem.Mock(basic{})

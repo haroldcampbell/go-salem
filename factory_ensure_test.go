@@ -16,7 +16,9 @@ func Test_FactoryEnsure(t *testing.T) {
 	test_nested_ensure(t)
 	test_slice_ensure(t)
 	test_slice_pointer_ensure(t)
+	test_sequence_across_ensure(t)
 	test_sequence_ensure(t)
+	test_sequence_across_splice_ensure(t)
 }
 
 func test_simple_ensure(t *testing.T) {
@@ -92,11 +94,11 @@ func test_slice_ensure(t *testing.T) {
 	assert.Equal(t, 5, len(actualMocks), "should set nested slice")
 }
 
-func test_sequence_ensure(t *testing.T) {
+func test_sequence_across_ensure(t *testing.T) {
 	requiredValue := "happiness"
 
 	f := salem.Mock(simple{})
-	f.EnsureSequence("PublicField", "a", requiredValue, "c")
+	f.EnsureSequenceAcross("PublicField", "a", requiredValue, "c")
 	f.WithExactItems(5)
 
 	results := f.Execute()
@@ -109,4 +111,83 @@ func test_sequence_ensure(t *testing.T) {
 	actual := []string{publicFields[0], publicFields[1], publicFields[2], publicFields[3], publicFields[4]}
 	assert.Equal(t, requiredValue, publicFields[1], "should be set to sequence value")
 	assert.Equal(t, expected, actual, "should set sequence values")
+}
+
+func test_sequence_ensure(t *testing.T) {
+	type people struct {
+		Name string
+		Cash money
+	}
+	type market struct {
+		Venue   string
+		Farmers []people
+	}
+
+	seq := []string{"Bill", "Ruth", "Mary", "Sally"}
+	tap := salem.Tap().
+		EnsureSequence("Farmers.Name", seq[0], seq[1], seq[2], seq[3]).
+		WithExactItems(2)
+
+	f := salem.Mock(market{}).
+		EnsureSequence("Venue", "Park Town", "Rose Hill", "Pretoria").
+		Ensure("Farmers", tap).
+		WithExactItems(2)
+
+	results := f.Execute()
+
+	m1 := results[0].(market)
+	m2 := results[1].(market)
+
+	assert.Equal(t, "Park Town", m1.Venue, "expect correct value from item index")
+	assert.Equal(t, "Rose Hill", m2.Venue, "expect correct value from item index")
+
+	s1 := m1.Farmers[0]
+	s2 := m1.Farmers[1]
+	s3 := m2.Farmers[0]
+	s4 := m2.Farmers[1]
+
+	assert.Equal(t, seq[0], s1.Name, "expect correct value from sequence using nested item index")
+	assert.Equal(t, seq[1], s2.Name, "expect correct value from sequence using nested item index")
+
+	// Sequence should restart for different list item index
+	assert.Equal(t, seq[0], s3.Name, "expect sequence to restart")
+	assert.Equal(t, seq[1], s4.Name, "expect sequence to restart")
+}
+
+func test_sequence_across_splice_ensure(t *testing.T) {
+	type people struct {
+		Name string
+		Cash money
+	}
+	type market struct {
+		Venue   string
+		Farmers []people
+	}
+
+	seq := []string{"Bill", "Ruth", "Mary", "Sally"}
+	tap := salem.Tap().
+		EnsureSequenceAcross("Farmers.Name", seq[0], seq[1], seq[2], seq[3]).
+		WithExactItems(2)
+
+	f := salem.Mock(market{}).
+		Ensure("Farmers", tap).
+		WithExactItems(2)
+
+	results := f.Execute()
+
+	m1 := results[0].(market)
+	m2 := results[1].(market)
+
+	s1 := m1.Farmers[0]
+	s2 := m1.Farmers[1]
+
+	s3 := m2.Farmers[0]
+	s4 := m2.Farmers[1]
+
+	assert.Equal(t, seq[0], s1.Name)
+	assert.Equal(t, seq[1], s2.Name)
+
+	// Sequence should continue based on sequence items' index
+	assert.Equal(t, seq[2], s3.Name, "expect sequence to continue based on sequence index")
+	assert.Equal(t, seq[3], s4.Name)
 }

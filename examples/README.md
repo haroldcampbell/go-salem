@@ -162,7 +162,15 @@ Salem allows you generate a values that falls within bounds set by `ConstrainStr
 		EnsureConstraint("FName", salem.ConstrainStringLength(4, 10)).
 		EnsureConstraint("Surname", salem.ConstrainStringLength(4, 10)).
 		WithExactItems(5)
-
 ```
 
 See [example 10](./ex-10/main.go).
+
+## Sequencing across items
+
+There are two general types of sequencing:
+
+-   Based on the items' index with `EnsureSequence`
+-   Base on the sequences' index with `EnsureSequenceAcross`
+
+See [example 11](./ex-11/main.go).

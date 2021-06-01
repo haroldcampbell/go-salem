@@ -9,6 +9,7 @@ import (
 
 type RunType uint
 type FactoryActionType func(reflect.Value, string) GenType
+type SequenceActionType func(int) GenType // func(itemIndex int) GenType
 
 const (
 	Invalid RunType = iota
@@ -24,13 +25,10 @@ type PlanRun struct {
 }
 
 type fieldSetter struct {
-	fieldAction   GenType
-	factoryAction FactoryActionType
+	fieldAction         GenType
+	factoryAction       FactoryActionType
+	fieldSequenceAction SequenceActionType
 }
-
-// type fieldConstaintSetter struct {
-// fieldConstraintAction func(field interface{}) bool
-// }
 
 type Plan struct {
 	omittedFields     map[string]bool            // ignore these fields
@@ -97,25 +95,51 @@ func (p *Plan) EnsuredFactoryFieldValue(fieldName string, sharedValue interface{
 	p.ensuredFields[fieldName] = setter
 }
 
+// EnsureSequence returns a seq item based on the item index
 func (p *Plan) EnsureSequence(fieldName string, seq []interface{}) {
-	var index int
+	seqHandler := func(itemIndex int) GenType {
+		action := func() interface{} {
+			var val interface{}
 
-	seqHandler := func() interface{} {
-		var val interface{}
+			if itemIndex < len(seq) {
+				val = seq[itemIndex]
+			}
 
-		if index < len(seq) {
-			val = seq[index]
+			result := val
+
+			return result
 		}
 
-		result := val
-		index += 1
-
-		return result
+		return action
 	}
 
-	p.AddFieldAction(fieldName, seqHandler)
+	p.ensuredFields[fieldName] = fieldSetter{fieldSequenceAction: seqHandler}
 }
 
+// EnsureSequenceAcross returns the seq[] items based on the sequence index.
+// The  sequenceIndex is iindependent of the item index.
+func (p *Plan) EnsureSequenceAcross(fieldName string, seq []interface{}) {
+	var sequenceIndex int
+	seqHandler := func(itemIndex int) GenType {
+
+		action := func() interface{} {
+			var val interface{}
+
+			if sequenceIndex < len(seq) {
+				val = seq[sequenceIndex]
+			}
+
+			result := val
+			sequenceIndex += 1
+
+			return result
+		}
+
+		return action
+	}
+
+	p.ensuredFields[fieldName] = fieldSetter{fieldSequenceAction: seqHandler}
+}
 func (p *Plan) SetRunCount(runType RunType, n int) {
 	p.run = &PlanRun{
 		RunType: runType,
@@ -139,14 +163,14 @@ func (p *Plan) Run(f *Factory) []interface{} {
 
 	items := make([]interface{}, 0)
 
-	for i := 0; i < p.run.Count; i++ {
-		items = append(items, p.generateRandomMock(f))
+	for itemIndex := 0; itemIndex < p.run.Count; itemIndex++ {
+		items = append(items, p.generateRandomMock(f, itemIndex))
 	}
 
 	return items
 }
 
-func (p *Plan) generateRandomMock(f *Factory) interface{} {
+func (p *Plan) generateRandomMock(f *Factory, itemIndex int) interface{} {
 	rand.Seed(time.Now().UnixNano())
 
 	v := reflect.ValueOf(f.rootType)
@@ -187,7 +211,7 @@ func (p *Plan) generateRandomMock(f *Factory) interface{} {
 			continue // Skip omitted fields
 		}
 
-		val := p.generateValue(k, iField, qualifiedName)
+		val := p.generateValue(k, iField, itemIndex, qualifiedName)
 
 		if !val.IsValid() {
 			// Uncomment to make EnsureSequence() set the values that fall outside of the sequence
@@ -202,18 +226,18 @@ func (p *Plan) generateRandomMock(f *Factory) interface{} {
 	}
 	return newMockPtr.Elem().Interface()
 }
-func (p *Plan) generateValue(k reflect.Kind, iField reflect.Value, qualifiedName string) reflect.Value {
+func (p *Plan) generateValue(k reflect.Kind, iField reflect.Value, itemIndex int, qualifiedName string) reflect.Value {
 	constraint := p.constrainedFields[qualifiedName]
-	generator := p.getValueGenerator(k, iField, qualifiedName)
+	generator := p.getValueGenerator(k, iField, itemIndex, qualifiedName)
 
 	if constraint == nil {
-		return p.generateFieldValue(k, generator, iField, qualifiedName)
+		return p.generateFieldValue(k, generator, iField, itemIndex, qualifiedName)
 	}
 
 	isValueFromEnsureAction := p.ensuredFields[qualifiedName].factoryAction != nil || p.ensuredFields[qualifiedName].fieldAction != nil
 
 	if isValueFromEnsureAction {
-		val := p.generateFieldValue(k, generator, iField, qualifiedName)
+		val := p.generateFieldValue(k, generator, iField, itemIndex, qualifiedName)
 		if !constraint.IsValid(val.Interface()) {
 			panic(fmt.Sprintf("Constraint clashes with one of your Ensure methods. Invalid FieldConstraint for field '%v'. Constraint: %#v.", qualifiedName, constraint))
 		}
@@ -224,7 +248,7 @@ func (p *Plan) generateValue(k reflect.Kind, iField reflect.Value, qualifiedName
 	var attempt = 0
 
 	for {
-		val = p.generateFieldValue(k, generator, iField, qualifiedName)
+		val = p.generateFieldValue(k, generator, iField, itemIndex, qualifiedName)
 		attempt += 1
 
 		if constraint.IsValid(val.Interface()) {
@@ -239,9 +263,11 @@ func (p *Plan) generateValue(k reflect.Kind, iField reflect.Value, qualifiedName
 	return val
 }
 
-func (p *Plan) getValueGenerator(k reflect.Kind, iField reflect.Value, qualifiedName string) GenType {
+func (p *Plan) getValueGenerator(k reflect.Kind, iField reflect.Value, itemIndex int, qualifiedName string) GenType {
 	if p.ensuredFields[qualifiedName].factoryAction != nil {
 		return p.ensuredFields[qualifiedName].factoryAction(iField, qualifiedName)
+	} else if p.ensuredFields[qualifiedName].fieldSequenceAction != nil {
+		return p.ensuredFields[qualifiedName].fieldSequenceAction(itemIndex)
 	} else if p.ensuredFields[qualifiedName].fieldAction != nil {
 		return p.ensuredFields[qualifiedName].fieldAction
 	}
@@ -249,7 +275,7 @@ func (p *Plan) getValueGenerator(k reflect.Kind, iField reflect.Value, qualified
 	return p.generators[k]
 }
 
-func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField reflect.Value, qualifiedName string) reflect.Value {
+func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField reflect.Value, itemIndex int, qualifiedName string) reflect.Value {
 	if isPrimativeKind(k) {
 		val := generator()
 		return reflect.ValueOf(val)
@@ -266,12 +292,12 @@ func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField refl
 	case reflect.Ptr:
 		ptrType := iField.Type().Elem() // The pointer's type
 		ptrK := ptrType.Kind()
-		generator := p.getValueGenerator(ptrK, iField, qualifiedName)
+		generator := p.getValueGenerator(ptrK, iField, itemIndex, qualifiedName)
 
 		newMockPtr := reflect.New(ptrType) // Make an instance based on the pointer type
 		newElm := newMockPtr.Elem()
 
-		val := p.generateFieldValue(ptrK, generator, newElm, qualifiedName)
+		val := p.generateFieldValue(ptrK, generator, newElm, itemIndex, qualifiedName)
 
 		vp := reflect.New(val.Type())
 		vp.Elem().Set(reflect.ValueOf(val.Interface()))

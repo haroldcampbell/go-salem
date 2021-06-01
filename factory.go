@@ -102,9 +102,19 @@ func (f *Factory) EnsureConstraint(fieldName string, constraint FieldConstraint)
 }
 
 // EnsureSequence is used to specify the actual values for the fields.
+// The sequence items are based their item index in the overall item list.
 // The values default to their empty value if the items exceed the number of squence items.
 func (f *Factory) EnsureSequence(fieldName string, seq ...interface{}) *Factory {
 	f.plan.EnsureSequence(fieldName, seq)
+
+	return f
+}
+
+// EnsureSequenceAcross is used to specify the actual values for the fields.
+// The sequence items are based on their sequence index as they are generated.
+// The values default to their empty value if the items exceed the number of squence items.
+func (f *Factory) EnsureSequenceAcross(fieldName string, seq ...interface{}) *Factory {
+	f.plan.EnsureSequenceAcross(fieldName, seq)
 
 	return f
 }
