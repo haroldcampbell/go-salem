@@ -12,6 +12,7 @@ type testConstraint struct {
 	actualField    interface{}
 }
 
+// So that testConstraint conforms to salem.FieldConstraint
 func (t *testConstraint) IsValid(field interface{}) bool {
 	t.didCallIsValid = true
 	t.actualField = field
@@ -69,6 +70,7 @@ func test_string_constrained_ensure(t *testing.T) {
 	f.EnsureConstraint("Name", salem.ConstrainStringLength(minBound, maxBound))
 
 	results := f.Execute()
+
 	actualMock := results[0].(human)
 
 	assert.True(t, len(actualMock.Name) >= minBound, "should constraint field to lower-bound")

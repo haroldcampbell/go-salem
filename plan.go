@@ -161,45 +161,43 @@ func (p *Plan) Run(f *Factory) []interface{} {
 	rand.Seed(time.Now().UnixNano())
 	p.evalItemCountAction()
 
-	items := make([]interface{}, 0)
+	items := make([]interface{}, 0, p.run.Count)
 
 	for itemIndex := 0; itemIndex < p.run.Count; itemIndex++ {
-		items = append(items, p.generateRandomMock(f, itemIndex))
+		mockType := reflect.TypeOf(f.rootType)
+
+		items = append(items, p.generateRandomMock(mockType, itemIndex))
 	}
 
 	return items
 }
 
-func (p *Plan) generateRandomMock(f *Factory, itemIndex int) interface{} {
+func (p *Plan) generateRandomMock(mockType reflect.Type, itemIndex int) interface{} {
 	rand.Seed(time.Now().UnixNano())
 
-	v := reflect.ValueOf(f.rootType)
-	typeOfT := v.Type()
-
 	// Create an mock instance of the struct
-	newMockPtr := reflect.New(typeOfT)
+	newMockPtr := reflect.New(mockType)
 	newElm := newMockPtr.Elem()
 
-	if v.Kind() == reflect.Ptr {
-		ptrType := v.Type().Elem()
+	if mockType.Kind() == reflect.Ptr {
+		ptrType := mockType.Elem()
 
 		newMockPtr = reflect.New(ptrType) // Make an instance based on the pointer type
 		newElm = newMockPtr.Elem()
 
-		v = newElm
-		typeOfT = v.Type()
+		mockType = newElm.Type()
 	}
 
-	if isPrimativeKind(v.Kind()) {
-		generator := p.generators[v.Kind()]
+	if isPrimativeKind(mockType.Kind()) {
+		generator := p.generators[mockType.Kind()]
 		val := generator()
 		return val
 	}
 
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i) // Get field in the struct
-		k := field.Kind()
-		fieldName := typeOfT.Field(i).Name
+	for i := 0; i < mockType.NumField(); i++ {
+		structField := mockType.Field(i) // Get field in the struct
+		k := structField.Type.Kind()
+		fieldName := mockType.Field(i).Name
 
 		iField := newElm.Field(i) // Get related instance field in the mock instance
 		if !iField.CanSet() {
@@ -283,6 +281,9 @@ func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField refl
 
 	// Complex Types
 	switch k {
+	case reflect.Map:
+		return p.updateMapFieldValue(generator, iField, qualifiedName)
+
 	case reflect.Slice:
 		return p.updateSliceFieldValue(generator, iField, qualifiedName)
 
@@ -311,6 +312,38 @@ func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField refl
 		fmt.Printf("[updateFieldValue] (Unknow type) %v \n", iField.Type().Name())
 	}
 	panic(fmt.Sprintf("[updateFieldValue] Unsupported type: %#v kind:%v", iField, k))
+}
+
+func (p *Plan) updateMapFieldValue(generator GenType, iField reflect.Value, qualifiedName string) reflect.Value {
+	// TODO: Implement support for maps
+	newMap := reflect.MakeMap(iField.Type())
+	mapKeyType := iField.Type().Key()
+	mapValueType := iField.Type().Elem()
+
+	var keyGenerator GenType
+	var valGenerator GenType
+	if isPrimativeKind(mapKeyType.Kind()) {
+		keyGenerator = p.GetKindGenerator(mapKeyType.Kind())
+	} else {
+		panic("Don't know how to generate key generator")
+	}
+	key := keyGenerator()
+
+	var val interface{}
+	if isPrimativeKind(mapValueType.Kind()) {
+		valGenerator = p.GetKindGenerator(mapValueType.Kind())
+		val = valGenerator()
+	} else {
+		// Create values that aren't primative types
+		val = p.generateRandomMock(mapValueType, 0)
+		if val == nil {
+			panic(fmt.Sprintf("Didn't find a value generator for: %v type", mapValueType))
+		}
+	}
+
+	newMap.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(val))
+
+	return newMap
 }
 
 func (p *Plan) updateSliceFieldValue(generator GenType, iField reflect.Value, qualifiedName string) reflect.Value {
