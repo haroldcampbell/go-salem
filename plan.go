@@ -225,16 +225,15 @@ func (p *Plan) generateRandomMock(mockType reflect.Type, itemIndex int) interfac
 	return newMockPtr.Elem().Interface()
 }
 func (p *Plan) generateValue(k reflect.Kind, fieldType reflect.Type, itemIndex int, qualifiedName string) reflect.Value {
-	constraint := p.constrainedFields[qualifiedName]
 	generator := p.getValueGenerator(k, fieldType, itemIndex, qualifiedName)
 
-	if constraint == nil {
+	constraint := p.constrainedFields[qualifiedName]
+	if constraint == nil { // Generate field value and exit since no constraint
 		return p.generateFieldValue(k, generator, fieldType, itemIndex, qualifiedName)
 	}
 
 	isValueFromEnsureAction := p.ensuredFields[qualifiedName].factoryAction != nil || p.ensuredFields[qualifiedName].fieldAction != nil
-
-	if isValueFromEnsureAction {
+	if isValueFromEnsureAction { // Ensure Ensured field meets constraint
 		val := p.generateFieldValue(k, generator, fieldType, itemIndex, qualifiedName)
 		if !constraint.IsValid(val.Interface()) {
 			panic(fmt.Sprintf("Constraint clashes with one of your Ensure methods. Invalid FieldConstraint for field '%v'. Constraint: %#v.", qualifiedName, constraint))
@@ -242,10 +241,9 @@ func (p *Plan) generateValue(k reflect.Kind, fieldType reflect.Type, itemIndex i
 		return val
 	}
 
-	var val reflect.Value
 	var attempt = 0
-
-	for {
+	var val reflect.Value
+	for { // Try till constraint is met or give up after maxConstraintRetryAttempts attemps
 		val = p.generateFieldValue(k, generator, fieldType, itemIndex, qualifiedName)
 		attempt += 1
 
