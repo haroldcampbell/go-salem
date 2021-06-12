@@ -8,7 +8,7 @@ import (
 )
 
 type RunType uint
-type FactoryActionType func(reflect.Value, string) GenType
+type FactoryActionType func(reflect.Type, string) GenType
 type SequenceActionType func(int) GenType // func(itemIndex int) GenType
 
 const (
@@ -209,7 +209,7 @@ func (p *Plan) generateRandomMock(mockType reflect.Type, itemIndex int) interfac
 			continue // Skip omitted fields
 		}
 
-		val := p.generateValue(k, iField, itemIndex, qualifiedName)
+		val := p.generateValue(k, iField.Type(), itemIndex, qualifiedName)
 
 		if !val.IsValid() {
 			// Uncomment to make EnsureSequence() set the values that fall outside of the sequence
@@ -224,18 +224,18 @@ func (p *Plan) generateRandomMock(mockType reflect.Type, itemIndex int) interfac
 	}
 	return newMockPtr.Elem().Interface()
 }
-func (p *Plan) generateValue(k reflect.Kind, iField reflect.Value, itemIndex int, qualifiedName string) reflect.Value {
+func (p *Plan) generateValue(k reflect.Kind, fieldType reflect.Type, itemIndex int, qualifiedName string) reflect.Value {
 	constraint := p.constrainedFields[qualifiedName]
-	generator := p.getValueGenerator(k, iField, itemIndex, qualifiedName)
+	generator := p.getValueGenerator(k, fieldType, itemIndex, qualifiedName)
 
 	if constraint == nil {
-		return p.generateFieldValue(k, generator, iField, itemIndex, qualifiedName)
+		return p.generateFieldValue(k, generator, fieldType, itemIndex, qualifiedName)
 	}
 
 	isValueFromEnsureAction := p.ensuredFields[qualifiedName].factoryAction != nil || p.ensuredFields[qualifiedName].fieldAction != nil
 
 	if isValueFromEnsureAction {
-		val := p.generateFieldValue(k, generator, iField, itemIndex, qualifiedName)
+		val := p.generateFieldValue(k, generator, fieldType, itemIndex, qualifiedName)
 		if !constraint.IsValid(val.Interface()) {
 			panic(fmt.Sprintf("Constraint clashes with one of your Ensure methods. Invalid FieldConstraint for field '%v'. Constraint: %#v.", qualifiedName, constraint))
 		}
@@ -246,7 +246,7 @@ func (p *Plan) generateValue(k reflect.Kind, iField reflect.Value, itemIndex int
 	var attempt = 0
 
 	for {
-		val = p.generateFieldValue(k, generator, iField, itemIndex, qualifiedName)
+		val = p.generateFieldValue(k, generator, fieldType, itemIndex, qualifiedName)
 		attempt += 1
 
 		if constraint.IsValid(val.Interface()) {
@@ -261,9 +261,9 @@ func (p *Plan) generateValue(k reflect.Kind, iField reflect.Value, itemIndex int
 	return val
 }
 
-func (p *Plan) getValueGenerator(k reflect.Kind, iField reflect.Value, itemIndex int, qualifiedName string) GenType {
+func (p *Plan) getValueGenerator(k reflect.Kind, fieldType reflect.Type, itemIndex int, qualifiedName string) GenType {
 	if p.ensuredFields[qualifiedName].factoryAction != nil {
-		return p.ensuredFields[qualifiedName].factoryAction(iField, qualifiedName)
+		return p.ensuredFields[qualifiedName].factoryAction(fieldType, qualifiedName)
 	} else if p.ensuredFields[qualifiedName].fieldSequenceAction != nil {
 		return p.ensuredFields[qualifiedName].fieldSequenceAction(itemIndex)
 	} else if p.ensuredFields[qualifiedName].fieldAction != nil {
@@ -273,7 +273,7 @@ func (p *Plan) getValueGenerator(k reflect.Kind, iField reflect.Value, itemIndex
 	return p.generators[k]
 }
 
-func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField reflect.Value, itemIndex int, qualifiedName string) reflect.Value {
+func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, fieldType reflect.Type, itemIndex int, qualifiedName string) reflect.Value {
 	if isPrimativeKind(k) {
 		val := generator()
 		return reflect.ValueOf(val)
@@ -282,23 +282,23 @@ func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField refl
 	// Complex Types
 	switch k {
 	case reflect.Map:
-		return p.updateMapFieldValue(generator, iField, qualifiedName)
+		return p.updateMapFieldValue(generator, fieldType, qualifiedName)
 
 	case reflect.Slice:
-		return p.updateSliceFieldValue(generator, iField, qualifiedName)
+		return p.updateSliceFieldValue(generator, fieldType, qualifiedName)
 
 	case reflect.Struct:
-		return p.updateStructFieldValue(generator, iField, qualifiedName)
+		return p.updateStructFieldValue(generator, fieldType, qualifiedName)
 
 	case reflect.Ptr:
-		ptrType := iField.Type().Elem() // The pointer's type
+		ptrType := fieldType.Elem() // The pointer's type
 		ptrK := ptrType.Kind()
-		generator := p.getValueGenerator(ptrK, iField, itemIndex, qualifiedName)
+		generator := p.getValueGenerator(ptrK, fieldType, itemIndex, qualifiedName)
 
 		newMockPtr := reflect.New(ptrType) // Make an instance based on the pointer type
 		newElm := newMockPtr.Elem()
 
-		val := p.generateFieldValue(ptrK, generator, newElm, itemIndex, qualifiedName)
+		val := p.generateFieldValue(ptrK, generator, newElm.Type(), itemIndex, qualifiedName)
 
 		vp := reflect.New(val.Type())
 		vp.Elem().Set(reflect.ValueOf(val.Interface()))
@@ -309,16 +309,15 @@ func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, iField refl
 		return reflect.ValueOf(nil)
 
 	default:
-		fmt.Printf("[updateFieldValue] (Unknow type) %v \n", iField.Type().Name())
+		fmt.Printf("[updateFieldValue] (Unknow type) %v \n", fieldType.Name())
 	}
-	panic(fmt.Sprintf("[updateFieldValue] Unsupported type: %#v kind:%v", iField, k))
+	panic(fmt.Sprintf("[updateFieldValue] Unsupported type: %#v kind:%v", fieldType, k))
 }
 
-func (p *Plan) updateMapFieldValue(generator GenType, iField reflect.Value, qualifiedName string) reflect.Value {
-	// TODO: Implement support for maps
-	newMap := reflect.MakeMap(iField.Type())
-	mapKeyType := iField.Type().Key()
-	mapValueType := iField.Type().Elem()
+func (p *Plan) updateMapFieldValue(generator GenType, fieldType reflect.Type, qualifiedName string) reflect.Value {
+	newMap := reflect.MakeMap(fieldType)
+	mapKeyType := fieldType.Key()
+	mapValueType := fieldType.Elem()
 
 	var keyGenerator GenType
 	var valGenerator GenType
@@ -329,35 +328,32 @@ func (p *Plan) updateMapFieldValue(generator GenType, iField reflect.Value, qual
 	}
 	key := keyGenerator()
 
-	var val interface{}
+	var val reflect.Value
 	if isPrimativeKind(mapValueType.Kind()) {
 		valGenerator = p.GetKindGenerator(mapValueType.Kind())
-		val = valGenerator()
+		result := valGenerator()
+		val = reflect.ValueOf(result)
 	} else {
-		// Create values that aren't primative types
-		val = p.generateRandomMock(mapValueType, 0)
-		if val == nil {
-			panic(fmt.Sprintf("Didn't find a value generator for: %v type", mapValueType))
-		}
+		val = p.generateFieldValue(mapValueType.Kind(), nil, mapValueType, 0, qualifiedName)
 	}
 
-	newMap.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(val))
+	newMap.SetMapIndex(reflect.ValueOf(key), val)
 
 	return newMap
 }
 
-func (p *Plan) updateSliceFieldValue(generator GenType, iField reflect.Value, qualifiedName string) reflect.Value {
+func (p *Plan) updateSliceFieldValue(generator GenType, fieldType reflect.Type, qualifiedName string) reflect.Value {
 	if generator == nil {
 		factoryAction := makeFactoryAction(Tap(), p)
-		generator = factoryAction(iField, qualifiedName)
+		generator = factoryAction(fieldType, qualifiedName)
 	}
 
 	factorySlice := generator()
 	unboxedSlized := reflect.ValueOf(factorySlice)
 	num := unboxedSlized.Len()
-	newSlice := reflect.MakeSlice(iField.Type(), num, num)
+	newSlice := reflect.MakeSlice(fieldType, num, num)
 
-	if iField.Type().Elem().Kind() == reflect.Ptr {
+	if fieldType.Elem().Kind() == reflect.Ptr {
 		for i := 0; i < unboxedSlized.Len(); i++ {
 			obj := unboxedSlized.Index(i).Elem()
 			newSlice.Index(i).Set(toPtr(obj))
@@ -380,14 +376,16 @@ func toPtr(obj reflect.Value) reflect.Value {
 	return vp
 }
 
-func (p *Plan) updateStructFieldValue(generator GenType, iField reflect.Value, qualifiedName string) reflect.Value {
+func (p *Plan) updateStructFieldValue(generator GenType, fieldType reflect.Type, qualifiedName string) reflect.Value {
 	if generator != nil {
 		val := generator()
 		return reflect.ValueOf(val)
 	}
 
-	iField.Interface()
-	mock := Mock(iField.Interface())
+	fieldPtr := reflect.New(fieldType) // Make an instance based on the pointer type
+	fieldVal := fieldPtr.Elem()
+
+	mock := Mock(fieldVal.Interface())
 
 	mock.plan.parentName = qualifiedName
 	mock.plan.CopyParentConstraints(p)
@@ -398,10 +396,12 @@ func (p *Plan) updateStructFieldValue(generator GenType, iField reflect.Value, q
 }
 
 func makeFactoryAction(fac *Factory, currentPlan *Plan) FactoryActionType {
-	return func(iField reflect.Value, qualifiedName string) func() interface{} {
+	return func(fieldType reflect.Type, qualifiedName string) func() interface{} {
+		fieldPtr := reflect.New(fieldType) // Make an instance based on the pointer type
+		fieldVal := fieldPtr.Elem()
 		// Extract the type from the slice and assign an instance to the rootType.
 		// I want to go from []examples.Person to example.Person
-		fac.rootType = reflect.New(reflect.TypeOf(iField.Interface()).Elem()).Elem().Interface() // Overwrite the factory with the public field type
+		fac.rootType = reflect.New(reflect.TypeOf(fieldVal.Interface()).Elem()).Elem().Interface() // Overwrite the factory with the public field type
 
 		return func() interface{} { // The actual generator
 			fac.plan.parentName = qualifiedName
