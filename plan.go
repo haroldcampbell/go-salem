@@ -73,14 +73,14 @@ func (p *Plan) OmitField(fieldName string) {
 
 }
 
-func (p *Plan) AddFieldAction(fieldName string, fieldActionHanlder GenType) {
-	p.ensuredFields[fieldName] = fieldSetter{fieldAction: fieldActionHanlder}
-}
-
 func (p *Plan) EnsuredFieldValue(fieldName string, sharedValue interface{}) {
-	p.AddFieldAction(fieldName, func() interface{} {
-		return sharedValue
-	})
+	setter := fieldSetter{
+		fieldAction: func() interface{} {
+			return sharedValue
+		},
+	}
+
+	p.ensuredFields[fieldName] = setter
 }
 
 func (p *Plan) EnsuredFieldValueConstraint(fieldName string, constraint FieldConstraint) {
