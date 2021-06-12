@@ -198,7 +198,7 @@ There is support for values that are primitive (e.g. int, string, etc.) types as
 	results := factory.Execute()
 ```
 
-...and slices of structs
+...and slices of structs.
 
 ```
 	type staff struct {

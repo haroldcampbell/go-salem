@@ -49,6 +49,11 @@ See the [examples](./examples/README.md) folder for more information.
 ## Features
 
 -   Control the value of public fields that are mocked with `Ensure(...)`
+-   Control the specfic values of public fields with `EnsureSequence(...)` and `EnsureSequenceAcross(...)`
+-   Apply constraints to values that are generated with `EnsureConstraint(...)`
 -   Control the number of mocks generated with `WithMinItems()`, `WithMaxItems()` and `WithExactItems()`
--   Mock nested structs automatically
+-   Control maps items with `WithMinMapItems()`, `WithMaxMapItems()` and `WithExactMapItems()`
 -   Control nested public fields with path name e.g. `ChildField.NestedChild.OtherNestedChild`
+-   Omit fields with `Omit(...)`
+-   Mock nested structs automatically
+-   Fined-grained control nested fields with `Tap()`
