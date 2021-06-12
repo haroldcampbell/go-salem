@@ -120,19 +120,14 @@ func (f *Factory) EnsureSequenceAcross(fieldName string, seq ...interface{}) *Fa
 }
 
 // WithMinItems generates at least n items
-// By default WithMinItems will generated [n, n+10) items. To change the upperBounds
-// specifiy the span.
+// By default WithMinItems will generated [n, n+10) items.
 //
+// To change the upperBounds from n+10 specifiy the span which will change the range to [n, n+span)
 // Only the first value of the span slice is used and it must be > 0.
+// In other words, WithMinItems(n, span, ignored, ignored, ...)
 func (f *Factory) WithMinItems(n int, span ...int) *Factory {
 	f.plan.SetItemCountHandler(func() {
-		var upperBounds int = 10
-
-		if len(span) > 0 && span[0] > 0 {
-			upperBounds = span[0]
-		}
-
-		f.plan.SetRunCount(MinRun, n+rand.Intn(upperBounds))
+		f.plan.SetRunCount(MinRun, minItem(n, span))
 	})
 
 	return f
@@ -154,4 +149,42 @@ func (f *Factory) WithExactItems(n int) *Factory {
 	})
 
 	return f
+}
+
+// WithExactMapItems generates exactly n items for a field that is a map
+func (f *Factory) WithExactMapItems(fieldName string, n int) *Factory {
+	f.plan.SetMapItemCountHandler(fieldName, func() {
+		f.plan.SetMapRunCount(fieldName, ExactRun, n)
+	})
+	return f
+}
+
+// WithMaxMapItems generates up to [0, n] items for a field that is a map
+func (f *Factory) WithMaxMapItems(fieldName string, n int) *Factory {
+	f.plan.SetMapItemCountHandler(fieldName, func() {
+		f.plan.SetMapRunCount(fieldName, MaxRun, rand.Intn(1+n))
+	})
+	return f
+}
+
+// WithMinMapItems generates at least n items for a field that is a map
+// By default WithMinMapItems will generated [n, n+10) items.
+//
+// See @WithMinItems for more discussion
+func (f *Factory) WithMinMapItems(fieldName string, n int, span ...int) *Factory {
+	f.plan.SetMapItemCountHandler(fieldName, func() {
+		f.plan.SetMapRunCount(fieldName, MinRun, minItem(n, span))
+	})
+	return f
+}
+
+// minItem returns a an in generated [n, n+10) items or [n, n+span[0])
+func minItem(n int, span []int) int {
+	var upperBounds int = 10
+
+	if len(span) > 0 && span[0] > 0 {
+		upperBounds = span[0]
+	}
+
+	return n + rand.Intn(upperBounds)
 }

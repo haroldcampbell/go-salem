@@ -36,10 +36,13 @@ type Plan struct {
 	constrainedFields map[string]FieldConstraint // fields constraints
 	generators        map[reflect.Kind]func() interface{}
 
-	run *PlanRun
-
+	run                 *PlanRun
 	evalItemCountAction func()
-	parentName          string
+
+	mapPlanRun             map[string]*PlanRun // plan runs for different Maps
+	evalMapItemCountAction map[string]func()
+
+	parentName string
 
 	maxConstraintRetryAttempts int
 }
@@ -53,6 +56,9 @@ func NewPlan() *Plan {
 	p.generators = make(map[reflect.Kind]func() interface{})
 	p.maxConstraintRetryAttempts = SuggestedConstraintRetryAttempts
 
+	p.mapPlanRun = make(map[string]*PlanRun)
+	p.evalMapItemCountAction = make(map[string]func())
+
 	p.initDefaultGenerators()
 
 	return p
@@ -60,6 +66,10 @@ func NewPlan() *Plan {
 func (p *Plan) GetPlanRun() *PlanRun {
 	return p.run
 }
+func (p *Plan) GetMapPlanRun(fieldName string) *PlanRun {
+	return p.mapPlanRun[fieldName]
+}
+
 func (p *Plan) SetMaxConstraintsRetryAttempts(maxRetries int) {
 	p.maxConstraintRetryAttempts = maxRetries
 }
@@ -67,7 +77,9 @@ func (p *Plan) SetMaxConstraintsRetryAttempts(maxRetries int) {
 func (p *Plan) SetItemCountHandler(handler func()) {
 	p.evalItemCountAction = handler
 }
-
+func (p *Plan) SetMapItemCountHandler(fieldName string, handler func()) {
+	p.evalMapItemCountAction[fieldName] = handler
+}
 func (p *Plan) OmitField(fieldName string) {
 	p.omittedFields[fieldName] = true
 
@@ -140,8 +152,16 @@ func (p *Plan) EnsureSequenceAcross(fieldName string, seq []interface{}) {
 
 	p.ensuredFields[fieldName] = fieldSetter{fieldSequenceAction: seqHandler}
 }
+
 func (p *Plan) SetRunCount(runType RunType, n int) {
 	p.run = &PlanRun{
+		RunType: runType,
+		Count:   n,
+	}
+}
+
+func (p *Plan) SetMapRunCount(fieldName string, runType RunType, n int) {
+	p.mapPlanRun[fieldName] = &PlanRun{
 		RunType: runType,
 		Count:   n,
 	}
@@ -319,23 +339,33 @@ func (p *Plan) updateMapFieldValue(generator GenType, fieldType reflect.Type, qu
 
 	var keyGenerator GenType
 	var valGenerator GenType
-	if isPrimativeKind(mapKeyType.Kind()) {
-		keyGenerator = p.GetKindGenerator(mapKeyType.Kind())
-	} else {
-		panic("Don't know how to generate key generator")
-	}
-	key := keyGenerator()
 
-	var val reflect.Value
-	if isPrimativeKind(mapValueType.Kind()) {
-		valGenerator = p.GetKindGenerator(mapValueType.Kind())
-		result := valGenerator()
-		val = reflect.ValueOf(result)
-	} else {
-		val = p.generateFieldValue(mapValueType.Kind(), nil, mapValueType, 0, qualifiedName)
+	var mapItemCount = 1
+
+	if p.evalMapItemCountAction[qualifiedName] != nil {
+		p.evalMapItemCountAction[qualifiedName]()
+		mapItemCount = p.mapPlanRun[qualifiedName].Count
 	}
 
-	newMap.SetMapIndex(reflect.ValueOf(key), val)
+	for mapItemIndex := 0; mapItemIndex < mapItemCount; mapItemIndex++ {
+		if isPrimativeKind(mapKeyType.Kind()) {
+			keyGenerator = p.GetKindGenerator(mapKeyType.Kind())
+		} else {
+			panic("Don't know how to generate key generator")
+		}
+		key := keyGenerator()
+
+		var val reflect.Value
+		if isPrimativeKind(mapValueType.Kind()) {
+			valGenerator = p.GetKindGenerator(mapValueType.Kind())
+			result := valGenerator()
+			val = reflect.ValueOf(result)
+		} else {
+			val = p.generateFieldValue(mapValueType.Kind(), nil, mapValueType, 0, qualifiedName)
+		}
+
+		newMap.SetMapIndex(reflect.ValueOf(key), val)
+	}
 
 	return newMap
 }
