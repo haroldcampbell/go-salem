@@ -182,3 +182,51 @@ There are two general types of sequencing:
 -   Base on the sequences' index with `EnsureSequenceAcross`
 
 See [example 11](./ex-11/main.go).
+
+## Maps
+
+Salem asl has the ability to generate maps.
+
+There is support for values that are primitive (e.g. int, string, etc.) types as well as structs and slices.
+
+```
+	type basic struct {
+		Lookup map[string]string
+	}
+
+	factory := salem.Mock(basic{})
+	results := factory.Execute()
+```
+
+...and slices of structs
+
+```
+	type staff struct {
+		StaffSales map[string][]transaction // staff ID -> transactions
+	}
+
+	factory := salem.Mock(staff{})
+	results := factory.Execute()
+```
+
+You also have 3 `factory.WithXXXMapItems(...)` functions to directly manipulate the map item count.
+
+-   `WithExactMapItems("Lookup", 5)`
+-   `WithMinMapItems("Lookup", 5)`
+-   `WithMaxMapItems("Lookup", 5)`
+
+Example:
+
+```
+	type staff struct {
+		Lookup map[string]string
+	}
+
+	factory := salem.Mock(staff{}).
+		WithExactMapItems("Lookup", 5)
+
+	results := factory.Execute()
+
+```
+
+See [example 12](./ex-12/main.go).
