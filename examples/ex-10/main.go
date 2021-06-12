@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"go-salem"
 	"go-salem/examples"
-	"go_utils/utils"
+
+	"github.com/haroldcampbell/go_utils/utils"
 )
 
 // ConstrainStringLength example
@@ -22,6 +23,6 @@ func main() {
 
 	target := factory.ExecuteToType().([]examples.Person)
 
-	str := utils.PrettyMongoString(target)
+	str := utils.PrettyMongoString((target))
 	fmt.Printf("Salem ExecuteToType mocks:\n%v\n\n", str)
 }

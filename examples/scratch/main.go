@@ -3,7 +3,8 @@ package main
 import (
 	"fmt"
 	"go-salem"
-	"go_utils/utils"
+
+	"github.com/haroldcampbell/go_utils/utils"
 )
 
 type basic struct {

@@ -2,6 +2,14 @@
 
 A list of examples showcasing the different API options of `Salem`
 
+**Note**: Before running the examples you'll need to get the dependency.
+
+```
+	go get github.com/haroldcampbell/go_utils/utils
+```
+
+This dependency is used for pretty-printting.
+
 ## Getting Started
 
 Here's how you use Salem in the most basic setup.
