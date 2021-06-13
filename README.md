@@ -48,13 +48,16 @@ See the [examples](./examples/README.md) folder for more information.
 
 ## Features
 
+-   Mock primities, structs, slices and maps automatically
 -   Control the value of public fields that are mocked with `Ensure(...)`
 -   Control the specfic values of public fields with `EnsureSequence(...)` and `EnsureSequenceAcross(...)`
--   Set the default key and values of public map fields with `EnsureMapKeySequence(...)` and `EnsureMapValueSequence(...)`
 -   Apply constraints to values that are generated with `EnsureConstraint(...)`
 -   Control the number of mocks generated with `WithMinItems()`, `WithMaxItems()` and `WithExactItems()`
--   Control maps items with `WithMinMapItems()`, `WithMaxMapItems()` and `WithExactMapItems()`
 -   Control nested public fields with path name e.g. `ChildField.NestedChild.OtherNestedChild`
 -   Omit fields with `Omit(...)`
--   Mock nested structs automatically
--   Fined-grained control nested fields with `Tap()`
+-   Mock nested fields automatically
+-   Retain fined-grained control nested fields with `Tap()`
+-   For public map fields:
+
+    -   Set the keys/values with `EnsureMapKeySequence(...)` and `EnsureMapValueSequence(...)`
+    -   Control the number of items with `WithMinMapItems()`, `WithMaxMapItems()` and `WithExactMapItems()`
