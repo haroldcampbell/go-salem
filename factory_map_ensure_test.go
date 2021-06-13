@@ -1,3 +1,6 @@
+// Copyright 2021 Harold Campbell. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 package salem_test
 
 import (
@@ -23,7 +26,7 @@ func (s *mapSuite) Test_ensure_map_keys() {
 	assert.Equal(t, 5, len(result.Genes))
 
 	actual := []string{}
-	for key, _ := range result.Genes {
+	for key := range result.Genes {
 		actual = append(actual, key)
 	}
 	assert.ElementsMatch(t, expectedKeys, actual, "Should create keys from EnsureMayKeySequence(...)")

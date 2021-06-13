@@ -1,3 +1,6 @@
+// Copyright 2021 Harold Campbell. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 package salem_test
 
 import (
@@ -51,7 +54,7 @@ func (s *mapSuite) Test_map_of_structs() {
 	assert.Equal(t, 1, len(result.Genes), "should map with 1 item")
 
 	keys := []string{}
-	for key, _ := range result.Genes {
+	for key := range result.Genes {
 		keys = append(keys, key)
 	}
 	item := result.Genes[keys[0]]
@@ -78,7 +81,7 @@ func (s *mapSuite) Test_map_of_slices() {
 	assert.Equal(t, 1, len(result.Genes), "should map with 1 item")
 
 	keys := []string{}
-	for key, _ := range result.Genes {
+	for key := range result.Genes {
 		keys = append(keys, key)
 	}
 	item := result.Genes[keys[0]]
