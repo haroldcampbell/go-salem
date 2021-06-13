@@ -229,4 +229,23 @@ Example:
 
 ```
 
+To set the default key and values of public map fields use `EnsureMapKeySequence(...)` and `EnsureMapValueSequence(...)`.
+
+```
+	keys := []interface{}{"2050391", "1705598", "22892120", "30716354", "33119748"}
+	values := []interface{}{
+		"How to check if a map contains a key in Go?",
+		"VS2008 : Start an external program on Debug",
+		"How to generate a random string of a fixed length in Go?",
+		"How do I do a literal *int64 in Go?",
+		"Convert time.Time to string",
+	}
+
+	results := salem.Mock(database{}).
+		EnsureMapValueSequence("Lookup", keys...). // Sets the values
+		EnsureMapKeySequence("Lookup", values...). // Sets the keys
+		WithExactMapItems("Lookup", 5).
+		Execute()
+```
+
 See [example 12](./ex-12/main.go).

@@ -50,6 +50,7 @@ See the [examples](./examples/README.md) folder for more information.
 
 -   Control the value of public fields that are mocked with `Ensure(...)`
 -   Control the specfic values of public fields with `EnsureSequence(...)` and `EnsureSequenceAcross(...)`
+-   Set the default key and values of public map fields with `EnsureMapKeySequence(...)` and `EnsureMapValueSequence(...)`
 -   Apply constraints to values that are generated with `EnsureConstraint(...)`
 -   Control the number of mocks generated with `WithMinItems()`, `WithMaxItems()` and `WithExactItems()`
 -   Control maps items with `WithMinMapItems()`, `WithMaxMapItems()` and `WithExactMapItems()`

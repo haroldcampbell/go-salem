@@ -119,6 +119,20 @@ func (f *Factory) EnsureSequenceAcross(fieldName string, seq ...interface{}) *Fa
 	return f
 }
 
+// EnsureMapKeySequence sets one or more keys for a map field
+func (f *Factory) EnsureMapKeySequence(fieldName string, seq ...interface{}) *Factory {
+	f.plan.EnsureMapKeySequence(fieldName, seq)
+
+	return f
+}
+
+// EnsureMapValueSequence set one or more values for the map field
+func (f *Factory) EnsureMapValueSequence(fieldName string, seq ...interface{}) *Factory {
+	f.plan.EnsureMapValueSequence(fieldName, seq)
+
+	return f
+}
+
 // WithMinItems generates at least n items
 // By default WithMinItems will generated [n, n+10) items.
 //
