@@ -25,6 +25,8 @@ func (p *Plan) initDefaultGenerators() {
 	p.generators[reflect.Float64] = randFloat64
 
 	p.generators[reflect.String] = randString
+
+	p.generators[reflect.Interface] = nilValue
 }
 
 func (p *Plan) GetKindGenerator(k reflect.Kind) GenType {
@@ -62,4 +64,8 @@ func randFloat64() interface{} {
 func randString() interface{} {
 	len := rand.Intn(50)
 	return utils.RandCharacters(3 + len) // Ensure we always have at least 3 chars
+}
+
+func nilValue() interface{} {
+	return nil
 }

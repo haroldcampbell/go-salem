@@ -18,7 +18,7 @@ func Test_Plan(t *testing.T) {
 func test_default_generators(t *testing.T) {
 	p := NewPlan()
 
-	assert.Equal(t, len(p.generators), 9, "expect all default generators to created")
+	assert.Equal(t, 10, len(p.generators), "expect all default generators to created")
 
 	assert.NotEmpty(t, p.GetKindGenerator(reflect.Bool), "expect generator for reflect.Bool")
 	assert.NotEmpty(t, p.GetKindGenerator(reflect.Int), "expect generator for reflect.Int")
@@ -29,6 +29,7 @@ func test_default_generators(t *testing.T) {
 	assert.NotEmpty(t, p.GetKindGenerator(reflect.Float32), "expect generator for reflect.Float32")
 	assert.NotEmpty(t, p.GetKindGenerator(reflect.Float64), "expect generator for reflect.Float64")
 	assert.NotEmpty(t, p.GetKindGenerator(reflect.String), "expect generator for reflect.String")
+	assert.NotEmpty(t, p.GetKindGenerator(reflect.Interface), "expect generator for reflect.Interface")
 }
 
 func test_ensured_field_value(t *testing.T) {

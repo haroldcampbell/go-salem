@@ -386,7 +386,8 @@ func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, fieldType r
 		return vp
 
 	case reflect.Interface:
-		return reflect.ValueOf(nil)
+		val := generator()
+		return reflect.ValueOf(val)
 
 	default:
 		fmt.Printf("[updateFieldValue] (Unknow type) %v \n", fieldType.Name())

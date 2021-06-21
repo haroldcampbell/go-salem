@@ -32,6 +32,36 @@ func Test_Factory(t *testing.T) {
 	assert.IsType(t, []simple{}, targetReuslt, "expect ExecuteToType() to return interface{} that is a slice of base type")
 }
 
+func Test_InterfaceEdgeCase(t *testing.T) {
+	type canvasElementModel struct {
+		Data interface{}
+	}
+
+	target := salem.Mock(canvasElementModel{}).
+		ExecuteToType().([]canvasElementModel)[0]
+
+	assert.Equal(t, nil, target.Data, "expect interface to be nil by default")
+}
+
+func Test_InterfaceEdgeCase_WithEnsure(t *testing.T) {
+	type canvasElementModel struct {
+		Data interface{}
+	}
+
+	data1 := "data attributes 101"
+	target1 := salem.Mock(canvasElementModel{}).
+		Ensure("Data", data1).
+		ExecuteToType().([]canvasElementModel)[0]
+
+	assert.Equal(t, data1, target1.Data, "expect interface types to be set with Ensure(string)")
+
+	data2 := 10
+	target2 := salem.Mock(canvasElementModel{}).
+		Ensure("Data", data2).
+		ExecuteToType().([]canvasElementModel)[0]
+
+	assert.Equal(t, data2, target2.Data, "expect interface types to be set with Ensure(int)")
+}
 func Test_FactoryOmit(t *testing.T) {
 	f := salem.Mock(school{})
 
