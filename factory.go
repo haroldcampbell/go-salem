@@ -195,6 +195,13 @@ func (f *Factory) WithMinMapItems(fieldName string, n int, span ...int) *Factory
 	return f
 }
 
+func (f *Factory) OnField(fieldName string, handler fieldHandlerType) *Factory {
+	f.plan.RemoveFieldHandler(fieldName) // Automatically removes existing field handlers
+	f.plan.AddFieldHandler(fieldName, handler)
+
+	return f
+}
+
 // minItem returns a an in generated [n, n+10) items or [n, n+span[0])
 func minItem(n int, span []int) int {
 	var upperBounds int = 10

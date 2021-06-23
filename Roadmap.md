@@ -6,7 +6,6 @@ Things to be implemented in the within the next month (Target: End July 2021)
 
 ## Core Capabilities
 
-1. Use a function as a param to generate data
 1. Generate the mocks as CSV
 1. Generate the mocks as JSON
 
@@ -42,3 +41,9 @@ that will be mocked
 1. Telephone numbers
 1. UUID
 1. Product code
+
+# COMPLETED
+
+1. [CORE] Use a function as a param to generate data June 23, 2020
+
+v1.0 - Public stable release - June 13, 2020 - https://github.com/haroldcampbell/go-salem/commit/2983a9ce132bfc8d06fb9cf9847d130a3ea27047

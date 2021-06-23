@@ -5,12 +5,28 @@ package salem_test
 
 import (
 	"go-salem"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 type human struct {
 	Genes map[string]string // gene[name] -> (DNA string sequence)
+}
+
+// func (s *mapSuite) Test_ensure_map_pointer() {
+func Test_ensure_map_pointer(t *testing.T) {
+	type human struct {
+		Genes map[string]*string
+	}
+
+	result := salem.Mock(human{}).
+		Ensure("Genes", map[string]*string{}). // <- The pointer makes it fail for some reason
+		ExecuteToType().([]human)[0]
+
+	// t := s.T()
+	assert.NotEmpty(t, result.Genes, "should create string map with Ensure")
+	assert.Equal(t, 1, len(result.Genes))
 }
 
 func (s *mapSuite) Test_ensure_map_keys() {

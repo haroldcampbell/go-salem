@@ -13,6 +13,7 @@ import (
 type RunType uint
 type FactoryActionType func(reflect.Type, string) GenType
 type SequenceActionType func(int) GenType // func(itemIndex int) GenType
+type fieldHandlerType func(int) interface{}
 
 const (
 	Invalid RunType = iota
@@ -35,8 +36,6 @@ type fieldSetter struct {
 
 // mapSetter used to hold the generators for keys of values for a map field
 type mapSetter struct {
-	// fieldAction         GenType
-	// factoryAction       FactoryActionType
 	fieldSequenceKeyAction   SequenceActionType
 	fieldSequenceValueAction SequenceActionType
 }
@@ -55,6 +54,8 @@ type Plan struct {
 	mapPlanRun             map[string]*PlanRun // plan runs for different Maps
 	evalMapItemCountAction map[string]func()
 
+	fieldHandlers map[string]fieldHandlerType // FieldName -> Handler
+
 	parentName string
 
 	maxConstraintRetryAttempts int
@@ -72,6 +73,8 @@ func NewPlan() *Plan {
 	p.ensuredMapFields = make(map[string]mapSetter)
 	p.mapPlanRun = make(map[string]*PlanRun)
 	p.evalMapItemCountAction = make(map[string]func())
+
+	p.fieldHandlers = make(map[string]fieldHandlerType)
 
 	p.initDefaultGenerators()
 
@@ -226,6 +229,18 @@ func (p *Plan) SetMapRunCount(fieldName string, runType RunType, n int) {
 	}
 }
 
+func (p *Plan) AddFieldHandler(fieldName string, handler fieldHandlerType) {
+	if p.fieldHandlers[fieldName] != nil {
+		panic(fmt.Sprintf("There is already a fieldHandler assigned to to the `%v` field. Remove the fieldhandler first.", fieldName))
+	}
+
+	p.fieldHandlers[fieldName] = handler
+}
+
+func (p *Plan) RemoveFieldHandler(fieldName string) {
+	p.fieldHandlers[fieldName] = nil
+}
+
 func (p *Plan) CopyParentConstraints(pp *Plan) {
 	for k, v := range pp.ensuredFields {
 		p.ensuredFields[k] = v
@@ -267,15 +282,13 @@ func (p *Plan) generateRandomMock(mockType reflect.Type, itemIndex int) interfac
 		mockType = newElm.Type()
 	}
 
-	if isPrimitiveKind(mockType.Kind()) {
-		generator := p.generators[mockType.Kind()]
+	if isPrimitiveKind(mockType) {
+		generator := p.GetKindGenerator(mockType.Kind())
 		val := generator()
 		return val
 	}
 
 	for i := 0; i < mockType.NumField(); i++ {
-		structField := mockType.Field(i) // Get field in the struct
-		k := structField.Type.Kind()
 		fieldName := mockType.Field(i).Name
 
 		iField := newElm.Field(i) // Get related instance field in the mock instance
@@ -288,32 +301,33 @@ func (p *Plan) generateRandomMock(mockType reflect.Type, itemIndex int) interfac
 			continue // Skip omitted fields
 		}
 
-		val := p.generateValue(k, iField.Type(), itemIndex, qualifiedName)
+		val := p.generateValue(iField.Type(), itemIndex, qualifiedName)
 
 		if !val.IsValid() {
-			// Uncomment to make EnsureSequence() set the values that fall outside of the sequence
-			// if isPrimativeKind(k) {
-			// gen := p.generators[k]
-			// val = reflect.ValueOf(gen())
-			// } else {
 			continue
-			// }
 		}
 		iField.Set(val)
 	}
 	return newMockPtr.Elem().Interface()
 }
-func (p *Plan) generateValue(k reflect.Kind, fieldType reflect.Type, itemIndex int, qualifiedName string) reflect.Value {
-	generator := p.getValueGenerator(k, fieldType, itemIndex, qualifiedName)
+
+func (p *Plan) generateValue(fieldType reflect.Type, itemIndex int, qualifiedName string) reflect.Value {
+	if p.fieldHandlers[qualifiedName] != nil {
+		generator := p.fieldHandlers[qualifiedName]
+		val := generator(itemIndex)
+		return reflect.ValueOf(val)
+	}
+
+	generator := p.getValueGenerator(fieldType, itemIndex, qualifiedName)
 
 	constraint := p.constrainedFields[qualifiedName]
 	if constraint == nil { // Generate field value and exit since no constraint
-		return p.generateFieldValue(k, generator, fieldType, itemIndex, qualifiedName)
+		return p.generateFieldValue(generator, fieldType, itemIndex, qualifiedName)
 	}
 
 	isValueFromEnsureAction := p.ensuredFields[qualifiedName].factoryAction != nil || p.ensuredFields[qualifiedName].fieldAction != nil
 	if isValueFromEnsureAction { // Ensure Ensured field meets constraint
-		val := p.generateFieldValue(k, generator, fieldType, itemIndex, qualifiedName)
+		val := p.generateFieldValue(generator, fieldType, itemIndex, qualifiedName)
 		if !constraint.IsValid(val.Interface()) {
 			panic(fmt.Sprintf("Constraint clashes with one of your Ensure methods. Invalid FieldConstraint for field '%v'. Constraint: %#v.", qualifiedName, constraint))
 		}
@@ -323,7 +337,7 @@ func (p *Plan) generateValue(k reflect.Kind, fieldType reflect.Type, itemIndex i
 	var attempt = 0
 	var val reflect.Value
 	for { // Try till constraint is met or give up after maxConstraintRetryAttempts attemps
-		val = p.generateFieldValue(k, generator, fieldType, itemIndex, qualifiedName)
+		val = p.generateFieldValue(generator, fieldType, itemIndex, qualifiedName)
 		attempt += 1
 
 		if constraint.IsValid(val.Interface()) {
@@ -338,7 +352,7 @@ func (p *Plan) generateValue(k reflect.Kind, fieldType reflect.Type, itemIndex i
 	return val
 }
 
-func (p *Plan) getValueGenerator(k reflect.Kind, fieldType reflect.Type, itemIndex int, qualifiedName string) GenType {
+func (p *Plan) getValueGenerator(fieldType reflect.Type, itemIndex int, qualifiedName string) GenType {
 	if p.ensuredFields[qualifiedName].factoryAction != nil {
 		return p.ensuredFields[qualifiedName].factoryAction(fieldType, qualifiedName)
 
@@ -350,14 +364,16 @@ func (p *Plan) getValueGenerator(k reflect.Kind, fieldType reflect.Type, itemInd
 
 	}
 
-	return p.generators[k]
+	return p.GetKindGenerator(fieldType.Kind())
 }
 
-func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, fieldType reflect.Type, itemIndex int, qualifiedName string) reflect.Value {
-	if isPrimitiveKind(k) {
+func (p *Plan) generateFieldValue(generator GenType, fieldType reflect.Type, itemIndex int, qualifiedName string) reflect.Value {
+	if isPrimitiveKind(fieldType) {
 		val := generator()
 		return reflect.ValueOf(val)
 	}
+
+	k := fieldType.Kind()
 
 	// Complex Types
 	switch k {
@@ -372,13 +388,12 @@ func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, fieldType r
 
 	case reflect.Ptr:
 		ptrType := fieldType.Elem() // The pointer's type
-		ptrK := ptrType.Kind()
-		generator := p.getValueGenerator(ptrK, fieldType, itemIndex, qualifiedName)
+		generator := p.getValueGenerator(ptrType, itemIndex, qualifiedName)
 
 		newMockPtr := reflect.New(ptrType) // Make an instance based on the pointer type
 		newElm := newMockPtr.Elem()
 
-		val := p.generateFieldValue(ptrK, generator, newElm.Type(), itemIndex, qualifiedName)
+		val := p.generateFieldValue(generator, newElm.Type(), itemIndex, qualifiedName)
 
 		vp := reflect.New(val.Type())
 		vp.Elem().Set(reflect.ValueOf(val.Interface()))
@@ -398,11 +413,9 @@ func (p *Plan) generateFieldValue(k reflect.Kind, generator GenType, fieldType r
 func (p *Plan) updateMapFieldValue(fieldType reflect.Type, qualifiedName string) reflect.Value {
 	newMap := reflect.MakeMap(fieldType)
 	mapKeyType := fieldType.Key()
-	mapValueType := fieldType.Elem()
 
-	keyKind := mapKeyType.Kind()
 	fieldSequenceKeyAction := p.ensuredMapFields[qualifiedName].fieldSequenceKeyAction
-	if fieldSequenceKeyAction == nil && !isPrimitiveKind(keyKind) {
+	if fieldSequenceKeyAction == nil && !isPrimitiveKind(mapKeyType) {
 		// Can't be generate the field by fieldSequenceAction(...) or p.GetKindGenerator(...)
 		panic(fmt.Sprintf("Don't know how to make the key-generator. Field: %v", qualifiedName))
 	}
@@ -413,40 +426,11 @@ func (p *Plan) updateMapFieldValue(fieldType reflect.Type, qualifiedName string)
 		mapItemCount = p.mapPlanRun[qualifiedName].Count
 	}
 
-	// Dynamically create the keyGenerator so we don't need to call the 'if'
-	// inside of the for loop
-	var keyGenerator func(param int) interface{}
-	if fieldSequenceKeyAction != nil {
-		keyGenerator = func(index int) interface{} {
-			return fieldSequenceKeyAction(index)()
-		}
-	} else {
-		// If we get here we are guaranteed that the generator is a
-		// isPrimitiveKind(...) and comes from p.GetKindGenerator(...)
-		keyGenerator = func(_ int) interface{} {
-			return p.GetKindGenerator(keyKind)()
-		}
-	}
+	// Dynamically create the keyGenerator
+	keyGenerator := p.createMapKeyGenerator(fieldSequenceKeyAction, mapKeyType)
 
 	// Dynamically create the valueGenerator
-	valueKind := mapValueType.Kind()
-	fieldSequenceValueAction := p.ensuredMapFields[qualifiedName].fieldSequenceValueAction
-	var valueGenerator func(param int) reflect.Value
-	if fieldSequenceValueAction != nil {
-		valueGenerator = func(index int) reflect.Value {
-			result := fieldSequenceValueAction(index)()
-			return reflect.ValueOf(result)
-		}
-	} else if isPrimitiveKind(valueKind) {
-		valueGenerator = func(_ int) reflect.Value {
-			result := p.GetKindGenerator(valueKind)()
-			return reflect.ValueOf(result)
-		}
-	} else {
-		valueGenerator = func(_ int) reflect.Value {
-			return p.generateFieldValue(valueKind, nil, mapValueType, 0, qualifiedName)
-		}
-	}
+	valueGenerator := p.createMapValueGenerator(fieldType.Elem(), qualifiedName)
 
 	for mapItemIndex := 0; mapItemIndex < mapItemCount; mapItemIndex++ {
 		key := keyGenerator(mapItemIndex)
@@ -456,6 +440,53 @@ func (p *Plan) updateMapFieldValue(fieldType reflect.Type, qualifiedName string)
 	}
 
 	return newMap
+}
+
+// createMapKeyGenerator is used to dynamically create the keyGenerator so we
+// don't need to call the 'if' inside of the for loop
+func (p *Plan) createMapKeyGenerator(fieldSequenceKeyAction SequenceActionType, mapKeyType reflect.Type) func(param int) interface{} {
+	if fieldSequenceKeyAction != nil {
+		return func(index int) interface{} {
+			return fieldSequenceKeyAction(index)()
+		}
+	}
+	// If we get here we are guaranteed that the generator is a
+	// isPrimitiveKind(...) and comes from p.GetKindGenerator(...)
+	return func(_ int) interface{} {
+		return p.GetKindGenerator(mapKeyType.Kind())()
+	}
+}
+
+// createMapValueGenerator is used to dynamically create the valueGenerator for a map's value
+func (p *Plan) createMapValueGenerator(mapValueType reflect.Type, qualifiedName string) func(param int) reflect.Value {
+	fieldSequenceValueAction := p.ensuredMapFields[qualifiedName].fieldSequenceValueAction
+
+	if fieldSequenceValueAction != nil {
+		return func(index int) reflect.Value {
+			result := fieldSequenceValueAction(index)()
+			return reflect.ValueOf(result)
+		}
+	} else if isPrimitiveKind(mapValueType) {
+		return func(_ int) reflect.Value {
+			result := p.GetKindGenerator(mapValueType.Kind())()
+			return reflect.ValueOf(result)
+		}
+	} else if isPrtPrimitiveKind(mapValueType) {
+		return func(_ int) reflect.Value {
+			// Get the primitive type the pointer points to then generate the primitive value
+			result := p.GetKindGenerator(mapValueType.Elem().Kind())()
+
+			// Convert value to a pointer
+			vp := reflect.New(mapValueType.Elem())
+			vp.Elem().Set(reflect.ValueOf(result))
+
+			return vp // Return the pointer
+		}
+	}
+
+	return func(_ int) reflect.Value {
+		return p.generateFieldValue(nil, mapValueType, 0, qualifiedName)
+	}
 }
 
 func (p *Plan) updateSliceFieldValue(generator GenType, fieldType reflect.Type, qualifiedName string) reflect.Value {
@@ -537,7 +568,9 @@ func distinctFileName(parentFieldName string, fieldName string) string {
 	return fmt.Sprintf("%s.%s", parentFieldName, fieldName)
 }
 
-func isPrimitiveKind(k reflect.Kind) bool {
+func isPrimitiveKind(t reflect.Type) bool {
+	k := t.Kind()
+
 	switch k {
 	case reflect.Bool,
 		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
@@ -549,4 +582,12 @@ func isPrimitiveKind(k reflect.Kind) bool {
 	}
 
 	return false
+}
+
+func isPrtPrimitiveKind(t reflect.Type) bool {
+	if t.Kind() != reflect.Ptr {
+		return false
+	}
+
+	return isPrimitiveKind(t.Elem())
 }

@@ -56,6 +56,7 @@ See the [examples](./examples/README.md) folder for more information.
 -   Control nested public fields with path name e.g. `ChildField.NestedChild.OtherNestedChild`
 -   Omit fields with `Omit(...)`
 -   Mock nested fields automatically
+-   Easily integrate with external APIs with via custom field handlers `OnField(...)`.
 -   Retain fined-grained control nested fields with `Tap()`
 -   For public map fields:
 

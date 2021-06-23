@@ -185,7 +185,7 @@ See [example 11](./ex-11/main.go).
 
 ## Maps
 
-Salem asl has the ability to generate maps.
+Salem aslo has the ability to generate maps.
 
 There is support for values that are primitive (e.g. int, string, etc.) types as well as structs and slices.
 
@@ -249,3 +249,24 @@ To set the default key and values of public map fields use `EnsureMapKeySequence
 ```
 
 See [example 12](./ex-12/main.go).
+
+## Function Handlers
+
+For those occasions that you need to function handler to create a field value, the `OnField(...)` function is perfect.
+
+This is most useful for integrating data from external APIs, databases, files, etc.
+
+```
+	names := []string{"Mary", "lilo", "Frank"}
+	fieldHandler := func(itemIndex int) interface{} {
+		return names[itemIndex]
+	}
+
+	factory := salem.Mock(person{}).
+		OnField("Name", fieldHandler).
+		WithExactItems(3)
+
+	results := factory.Execute()
+```
+
+See [example 13](./ex-13/main.go) for more examples
