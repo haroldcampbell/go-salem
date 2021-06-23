@@ -62,3 +62,7 @@ See the [examples](./examples/README.md) folder for more information.
 
     -   Set the keys/values with `EnsureMapKeySequence(...)` and `EnsureMapValueSequence(...)`
     -   Control the number of items with `WithMinMapItems()`, `WithMaxMapItems()` and `WithExactMapItems()`
+
+## Roadmap
+
+The planned list of features is [here](./Roadmap.md)
